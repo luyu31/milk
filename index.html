@@ -2,33 +2,42 @@
 <html lang="zh-CN" data-theme="light" data-color-theme="black-white">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="theme-color" content="#000000">
 
-    <title>传讯</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;500;600&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <link rel="icon" type="image/png" sizes="192x192" href="https://file.youtochat.com/images/20260216/1771224856844_qdqqd.jpeg">
-    <link rel="apple-touch-icon" href="https://file.youtochat.com/images/20260216/1771224856844_qdqqd.jpeg">
-    <meta name="apple-mobile-web-app-title" content="ʚ𝑳𝑶𝑽𝑬ɞ">
+    <title>Apple Hut</title>
+    <link rel="stylesheet" href="vendor/fontawesome/css/all.min.css">
+    <link rel="icon" type="image/png" sizes="192x192" href="art/icon-1024.png">
+    <link rel="apple-touch-icon" href="art/icon-1024.png">
+    <meta name="apple-mobile-web-app-title" content="Apple Hut">
 
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/localforage/1.10.0/localforage.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <script src="vendor/js/localforage.min.js"></script>
+    <script src="vendor/js/jszip.min.js"></script>
 
     <link rel="stylesheet" href="css/styles.css">
+    <link rel="stylesheet" href="css/applehut.css">
 
     <style id="css-live-preview-style"></style>
 </head>
 <body>
+<div id="applehut-cover" role="button" tabindex="0" aria-label="轻触进入 Apple Hut">
+    <div class="applehut-cover-stage">
+        <img class="applehut-cover-art" src="art/cover.png" alt="Apple Hut 像素封面：一只大红苹果和一只小青苹果">
+        <div class="applehut-cover-sub">青苹果与红苹果的小屋</div>
+        <div class="applehut-cover-enter">
+            <span class="applehut-cover-heart">♥</span>
+            轻触进入
+            <span class="applehut-cover-heart">♥</span>
+        </div>
+    </div>
+</div>
 <div id="splash-declaration">
     <div class="splash-letter">
         <header class="splash-letter-header">
-            <div class="splash-brand">传讯</div>
+            <div class="splash-brand">Apple Hut</div>
             <div class="splash-letter-kicker">使用前声明</div>
             <div class="splash-progress" aria-hidden="true">
                 <div class="splash-progress-fill" id="splash-progress-fill"></div>
@@ -122,7 +131,7 @@
             <button type="button" class="splash-btn splash-btn-text" id="splash-prev-btn" disabled>上一页</button>
             <span class="splash-page-num" id="splash-page-num">1 / 7</span>
             <button type="button" class="splash-btn splash-btn-next" id="splash-next-btn">下一页</button>
-            <button type="button" class="splash-btn splash-btn-enter" id="splash-enter-btn" style="display:none;" disabled>进入传讯</button>
+            <button type="button" class="splash-btn splash-btn-enter" id="splash-enter-btn" style="display:none;" disabled>进入 Apple Hut</button>
         </footer>
     </div>
 </div>
@@ -163,7 +172,7 @@
             </div>
 
             <div class="text-tech-container">
-                <div class="welcome-title-glitch" id="welcome-title-glitch" data-text="传讯">
+                <div class="welcome-title-glitch" id="welcome-title-glitch" data-text="Apple Hut">
                     加载失败
                 </div>
                 <div class="welcome-subtitle-scramble" id="welcome-subtitle-scramble">
@@ -666,7 +675,7 @@
             <i class="fas fa-images" style="font-size: 16px;"></i>
         </div>
         <div>
-            <div style="font-size: 14px; font-weight: 600; color: var(--text-primary); letter-spacing: 0.5px;">传讯专属画廊</div>
+            <div style="font-size: 14px; font-weight: 600; color: var(--text-primary); letter-spacing: 0.5px;">Apple Hut 专属画廊</div>
             <div style="font-size: 11px; color: var(--text-secondary); margin-top: 2px;">获取气泡等素材</div>
         </div>
     </div>
@@ -2236,6 +2245,7 @@
     <script src="js/data.js"></script>
     <script src="js/onboarding.js"></script> 
     <script src="js/listeners.js"></script>
+    <script src="js/applehut-bridge.js"></script>
     <script src="js/app.js"></script>
 </body>
 </html>

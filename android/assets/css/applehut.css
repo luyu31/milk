@@ -1,0 +1,108 @@
+/* Apple Hut 像素封面与手机端适配 */
+
+#applehut-cover {
+    position: fixed;
+    inset: 0;
+    z-index: 2147483000;
+    background: #fff6e4;
+    overflow: hidden;
+    cursor: pointer;
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: opacity 0.55s ease, transform 0.55s ease;
+}
+
+#applehut-cover * {
+    -webkit-tap-highlight-color: transparent;
+}
+
+.applehut-cover-stage {
+    position: relative;
+    height: 100%;
+    width: calc(100vh * 0.46154);
+    max-width: 100%;
+    flex: none;
+    overflow: hidden;
+}
+
+.applehut-cover-art {
+    width: 100%;
+    height: 100%;
+    display: block;
+    object-fit: cover;
+    object-position: center top;
+    image-rendering: pixelated;
+    image-rendering: crisp-edges;
+    user-select: none;
+    -webkit-user-drag: none;
+    pointer-events: none;
+}
+
+.applehut-cover-sub {
+    position: absolute;
+    top: 25.5%;
+    left: 50%;
+    transform: translateX(-50%);
+    padding: 7px 14px;
+    background: #fffaf0;
+    border: 3px solid #4a2b1e;
+    box-shadow: 4px 4px 0 #d89a5c;
+    color: #4a2b1e;
+    font-family: 'Noto Serif SC', 'Songti SC', 'STSong', serif;
+    font-size: 14px;
+    font-weight: 600;
+    letter-spacing: 3px;
+    white-space: nowrap;
+}
+
+.applehut-cover-enter {
+    position: absolute;
+    left: 50%;
+    bottom: calc(7% + env(safe-area-inset-bottom, 0px));
+    transform: translateX(-50%);
+    padding: 11px 22px;
+    background: #fffaf0;
+    border: 4px solid #4a2b1e;
+    box-shadow: 6px 6px 0 #d89a5c;
+    color: #4a2b1e;
+    font-family: 'Courier New', monospace;
+    font-size: 15px;
+    font-weight: 700;
+    letter-spacing: 4px;
+    white-space: nowrap;
+    animation: applehut-enter-bob 1.8s steps(2, end) infinite;
+}
+
+.applehut-cover-heart {
+    display: inline-block;
+    color: #e23b3b;
+    margin: 0 2px;
+    animation: applehut-heart 1.2s steps(2, end) infinite;
+}
+
+@keyframes applehut-enter-bob {
+    0%, 100% { transform: translate(-50%, 0); }
+    50% { transform: translate(-50%, -6px); }
+}
+
+@keyframes applehut-heart {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.25); }
+}
+
+#applehut-cover.applehut-cover-out {
+    opacity: 0;
+    transform: scale(1.04);
+    pointer-events: none;
+}
+
+/* 手机端滚动与点击手感 */
+@media (max-width: 640px) {
+    .applehut-cover-sub {
+        font-size: 13px;
+        letter-spacing: 2px;
+    }
+}
