@@ -46,6 +46,15 @@
         +     '</div>'
         +   '</div>'
 
+        +   '<div class="dm-section-label"><i class="fas fa-cloud"></i> 多设备同步</div>'
+        +   '<div class="dm-row-card">'
+        +     '<div class="dm-row-item" id="ah-sync-entry" style="cursor:pointer">'
+        +       '<div class="dm-row-icon blue"><i class="fas fa-cloud"></i></div>'
+        +       '<div class="dm-row-info"><div class="dm-row-title">Apple Hut 云同步</div><div class="dm-row-desc" id="ah-sync-status-text">登录同一账号，多设备进度一致</div></div>'
+        +       '<button class="dm-nav-btn"><i class="fas fa-chevron-right"></i></button>'
+        +     '</div>'
+        +   '</div>'
+
         +   '<div style="display:none">'
         +     '<button id="export-all-settings"></button>'
         +     '<button id="import-all-settings"></button>'
@@ -279,6 +288,11 @@
         var tileChatBackup = mc.querySelector('#dm-tile-chat-backup');
         if (tileChatBackup) tileChatBackup.addEventListener('click', function () { openDrawer('dm-drawer-chat'); });
 
+        var syncEntry = mc.querySelector('#ah-sync-entry');
+        if (syncEntry) syncEntry.addEventListener('click', function () {
+            if (window.AppleHutSync && window.AppleHutSync.openPanel) window.AppleHutSync.openPanel();
+        });
+
         var fullDrawer = document.getElementById('dm-drawer-full');
         if (fullDrawer) {
             var backdrop1 = fullDrawer.querySelector('#dm-drawer-full-backdrop');
@@ -418,6 +432,10 @@
         setTimeout(function () {
             updateStats();
             syncToggles();
+            var syncStatus = document.getElementById('ah-sync-status-text');
+            if (syncStatus && window.AppleHutSync && window.AppleHutSync.statusText) {
+                syncStatus.textContent = window.AppleHutSync.statusText();
+            }
         }, 60);
     }
 

@@ -6,6 +6,16 @@
     var cover = document.getElementById('applehut-cover');
     var closed = false;
 
+    // 云同步应用数据后刷新页面：跳过封面，避免闪一下
+    try {
+        if (sessionStorage.getItem('AH_SKIP_COVER') === '1') {
+            sessionStorage.removeItem('AH_SKIP_COVER');
+            closed = true;
+            if (cover && cover.parentNode) cover.parentNode.removeChild(cover);
+            cover = null;
+        }
+    } catch (e) {}
+
     function closeCover() {
         if (closed || !cover) return;
         closed = true;
