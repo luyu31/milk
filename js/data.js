@@ -69,6 +69,22 @@
         +       '<div class="dm-row-info"><div class="dm-row-title">后台消息推送</div><div class="dm-row-desc" id="notif-status-text">收到新消息时弹出提醒</div></div>'
         +       '<label class="dm-toggle-pill"><input type="checkbox" id="notif-permission-toggle" onchange="handleNotifToggle(this)"><span class="dm-toggle-slider"></span></label>'
         +     '</div>'
+        +     '<div class="dm-row-item" id="notif-interval-row" style="display:none">'
+        +       '<div class="dm-row-icon amber"><i class="fas fa-clock"></i></div>'
+        +       '<div class="dm-row-info"><div class="dm-row-title">推送频率</div><div class="dm-row-desc">关掉应用后，隔多久给你发一条消息</div></div>'
+        +       '<select id="notif-interval-select" style="background:var(--secondary-bg);color:var(--text-primary);border:1px solid var(--border-color);border-radius:10px;padding:6px 8px;font-size:12px;font-family:var(--font-family);">'
+        +         '<option value="15">15 分钟</option>'
+        +         '<option value="30">30 分钟</option>'
+        +         '<option value="60">1 小时</option>'
+        +         '<option value="120">2 小时</option>'
+        +         '<option value="180">3 小时</option>'
+        +       '</select>'
+        +     '</div>'
+        +     '<div class="dm-row-item" id="notif-keepalive-row" style="display:none;cursor:pointer">'
+        +       '<div class="dm-row-icon slate"><i class="fas fa-shield-halved"></i></div>'
+        +       '<div class="dm-row-info"><div class="dm-row-title">后台运行权限</div><div class="dm-row-desc">华为 / 荣耀手机建议在这里允许后台活动</div></div>'
+        +       '<button class="dm-nav-btn"><i class="fas fa-chevron-right"></i></button>'
+        +     '</div>'
         +     '<div class="dm-row-item" id="replay-tutorial-btn-row" style="cursor:pointer">'
         +       '<div class="dm-row-icon slate"><i class="fas fa-compass"></i></div>'
         +       '<div class="dm-row-info"><div class="dm-row-title">重放新手引导</div><div class="dm-row-desc">重新播放功能介绍教程</div></div>'
@@ -249,6 +265,10 @@
 
     function syncToggles() {
         var n = document.getElementById('notif-permission-toggle');
+        if (window.AHNativePush && window.AHNativePush.available) {
+            if (window.AHNativePush.refreshUI) window.AHNativePush.refreshUI();
+            return;
+        }
         if (n) n.checked = localStorage.getItem('notifEnabled') === '1'
                         && 'Notification' in window
                         && Notification.permission === 'granted';

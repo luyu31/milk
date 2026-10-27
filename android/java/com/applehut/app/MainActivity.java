@@ -1,11 +1,14 @@
 package com.applehut.app;
 
+import android.Manifest;
 import android.annotation.SuppressLint;
 import android.app.Activity;
 import android.content.Intent;
+import android.content.pm.PackageManager;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
+import android.provider.Settings;
 import android.util.Base64;
 import android.view.View;
 import android.view.Window;
@@ -34,6 +37,9 @@ public class MainActivity extends Activity {
     private static final String START_URL = "https://" + HOST + "/index.html";
     private static final int REQ_FILE = 1001;
     private static final int REQ_SAVE = 1002;
+    private static final int REQ_NOTIFICATIONS = 1003;
+
+    static volatile boolean isForeground = false;
 
     private WebView webView;
     private ValueCallback<Uri[]> fileCallback;
@@ -74,6 +80,7 @@ public class MainActivity extends Activity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        PushHelper.ensureChannel(this);
 
         Window window = getWindow();
         window.setStatusBarColor(0xFFF8F2E9);
@@ -215,6 +222,67 @@ public class MainActivity extends Activity {
         }
 
         @JavascriptInterface
+        public boolean hasNotificationPermission() {
+            return PushHelper.canNotify(MainActivity.this);
+        }
+
+        @JavascriptInterface
+        public void requestNotificationPermission() {
+            if (Build.VERSION.SDK_INT < 33) return;
+            if (PushHelper.canNotify(MainActivity.this)) return;
+            runOnUiThread(new Runnable() {
+                @Override
+                public void run() {
+                    try {
+                        requestPermissions(new String[]{Manifest.permission.POST_NOTIFICATIONS}, REQ_NOTIFICATIONS);
+                    } catch (Throwable ignored) {
+                    }
+                }
+            });
+        }
+
+        @JavascriptInterface
+        public void notify(String title, String body) {
+            PushHelper.post(MainActivity.this, title, body);
+        }
+
+        @JavascriptInterface
+        public void setPushConfig(String json) {
+            PushStore.saveConfig(MainActivity.this, json);
+        }
+
+        @JavascriptInterface
+        public String consumePendingMessages() {
+            try {
+                String raw = PushStore.consumeQueue(MainActivity.this);
+                PushHelper.clearAll(MainActivity.this);
+                return raw;
+            } catch (Throwable t) {
+                return "[]";
+            }
+        }
+
+        @JavascriptInterface
+        public boolean isNativePushSupported() {
+            return true;
+        }
+
+        @JavascriptInterface
+        public void openAppSettings() {
+            runOnUiThread(new Runnable() {
+                @Override
+                public void run() {
+                    try {
+                        Intent intent = new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS);
+                        intent.setData(Uri.parse("package:" + getPackageName()));
+                        startActivity(intent);
+                    } catch (Throwable ignored) {
+                    }
+                }
+            });
+        }
+
+        @JavascriptInterface
         public void saveFile(String name, String mime, String base64) {
             pendingName = (name == null || name.trim().isEmpty()) ? "applehut-file" : name;
             pendingMime = (mime == null || mime.trim().isEmpty()) ? "application/octet-stream" : mime;
@@ -291,6 +359,7 @@ public class MainActivity extends Activity {
 
     @Override
     protected void onPause() {
+        isForeground = false;
         if (webView != null) {
             webView.onPause();
         }
@@ -300,8 +369,12 @@ public class MainActivity extends Activity {
     @Override
     protected void onResume() {
         super.onResume();
+        isForeground = true;
         if (webView != null) {
             webView.onResume();
+            webView.evaluateJavascript(
+                    "window.AHNativePush&&AHNativePush.consumeIntoChat&&AHNativePush.consumeIntoChat();",
+                    null);
         }
     }
 

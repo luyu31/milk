@@ -52,6 +52,15 @@ document.addEventListener('DOMContentLoaded', async () => {
         updateLoader('正在读取记忆存档...', '40%');
         await safeAwait(loadData());
 
+        // 把后台推送期间收到的消息补进聊天
+        try {
+            if (window.AHNativePush && window.AHNativePush.consumeIntoChat) {
+                await safeAwait(window.AHNativePush.consumeIntoChat());
+            }
+        } catch (e) {
+            console.warn('[boot] 后台消息汇入失败:', e);
+        }
+
         updateLoader('正在渲染我们的世界...', '70%');
         
         await Promise.allSettled([
