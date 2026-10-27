@@ -509,7 +509,7 @@ function populateThemeSelector() {
         const THEME_COLOR_NAMES = {
             'gold': '金色', 'blue': '蓝色', 'purple': '紫色', 'green': '绿色',
             'pink': '粉色', 'black-white': '黑白', 'pastel': '柔蓝', 
-            'sunset': '夕阳', 'forest': '森林', 'ocean': '深蓝'
+            'sunset': '夕阳', 'forest': '森林', 'ocean': '深蓝', 'xia-yizhou': '橙蓝'
         };
         const BUBBLE_STYLE_NAMES_SCM = { standard: '标准', rounded: '圆角', 'rounded-large': '大圆角', square: '方形' };
 
@@ -636,6 +636,7 @@ function populateThemeSelector() {
                 sunset: ['#FF9A8B', '#fff0ee', '#333333'],
                 forest: ['#7BA05B', '#eef5e8', '#333333'],
                 ocean: ['#4A90E2', '#e8f1fc', '#333333'],
+                'xia-yizhou': ['#EE8A4F', '#EDF4FB', '#4C7DA8'],
             };
             const theme = scheme.colorTheme;
             if (theme && theme.startsWith('custom-')) {

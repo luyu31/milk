@@ -142,7 +142,7 @@ function loadMoreHistory() {
                 myStatus: "在线",
                 partnerStatus: "在线",
                 isDarkMode: false,
-                colorTheme: "gold",
+                colorTheme: "xia-yizhou",
                 soundEnabled: true,
                 typingIndicatorEnabled: true,
                 readReceiptsEnabled: true,
@@ -334,6 +334,17 @@ const loadData = async () => {
         if (savedPartnerPersonas) partnerPersonas = savedPartnerPersonas;
 
         if (savedSettings) Object.assign(settings, savedSettings);
+
+        // 1.2.0 起默认主色调改为「橙蓝 · 夏以昼」，老版本默认的金色自动迁移一次
+        try {
+            if (!safeGetItem('AH_THEME_ORANGE_BLUE')) {
+                if (settings.colorTheme === 'gold') {
+                    settings.colorTheme = 'xia-yizhou';
+                    if (typeof throttledSaveData === 'function') throttledSaveData();
+                }
+                safeSetItem('AH_THEME_ORANGE_BLUE', '1');
+            }
+        } catch (e) {}
 
         if (settings.showPartnerNameInChat !== undefined) {
             showPartnerNameInChat = settings.showPartnerNameInChat;

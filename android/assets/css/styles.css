@@ -102,6 +102,64 @@
             --accent-color-dark: #2E5B9A;
             --accent-color-rgb: 74, 144, 226;
         }
+        /* 橙蓝「夏以昼」：暖橙 × 深海蓝 */
+        :root[data-color-theme="xia-yizhou"] {
+            --accent-color: #EE8A4F;
+            --accent-color-dark: #E2763A;
+            --accent-color-rgb: 238, 138, 79;
+            --ah-blue: #4C7DA8;
+            --ah-blue-rgb: 76, 125, 168;
+            --message-sent-bg: #EE8A4F;
+            --message-sent-text: #FFFFFF;
+            --message-received-bg: #EDF4FB;
+            --message-received-text: #263B4F;
+            --toolbar-btn-bg: #E7F0F8;
+            --toolbar-btn-color: #4C7DA8;
+            --favorite-color: #F2A03D;
+            --timestamp-color: #8497A9;
+            --surface-border: rgba(76, 125, 168, 0.18);
+            --focus-ring-color: rgba(238, 138, 79, 0.34);
+        }
+        html[data-theme="dark"][data-color-theme="xia-yizhou"] {
+            --accent-color: #F09057;
+            --accent-color-dark: #E2763A;
+            --accent-color-rgb: 240, 144, 87;
+            --message-sent-bg: #E2763A;
+            --message-sent-text: #FFFFFF;
+            --message-received-bg: #212F3B;
+            --message-received-text: #DCE7F0;
+            --toolbar-btn-bg: #263746;
+            --toolbar-btn-color: #9CC3E4;
+            --timestamp-color: #8FA2B4;
+            --surface-border: rgba(156, 195, 228, 0.18);
+        }
+        /* 该主题的细节质感 */
+        :root[data-color-theme="xia-yizhou"] .header {
+            background: linear-gradient(118deg, rgba(238, 138, 79, 0.11), rgba(255, 255, 255, 0.74) 44%, rgba(76, 125, 168, 0.13)) !important;
+        }
+        html[data-theme="dark"][data-color-theme="xia-yizhou"] .header {
+            background: linear-gradient(118deg, rgba(238, 138, 79, 0.17), rgba(30, 30, 30, 0.76) 44%, rgba(76, 125, 168, 0.22)) !important;
+        }
+        :root[data-color-theme="xia-yizhou"] .message-sent {
+            background-image: linear-gradient(135deg, #F6A15F, #E2763A);
+            box-shadow: 0 2px 10px rgba(226, 118, 58, 0.22);
+        }
+        :root[data-color-theme="xia-yizhou"] .message-sent .message-time,
+        :root[data-color-theme="xia-yizhou"] .message-sent .message-meta {
+            color: rgba(255, 255, 255, 0.82);
+        }
+        :root[data-color-theme="xia-yizhou"] .message-received {
+            box-shadow: 0 2px 9px rgba(76, 125, 168, 0.12);
+        }
+        :root[data-color-theme="xia-yizhou"] .message-input:focus {
+            border-color: var(--ah-blue);
+            box-shadow: 0 0 0 3px rgba(76, 125, 168, 0.14);
+        }
+        :root[data-color-theme="xia-yizhou"] .send-btn,
+        :root[data-color-theme="xia-yizhou"] .batch-btn.active {
+            background-image: linear-gradient(135deg, #F5A063 0%, #4C7DA8 100%);
+            background-color: #4C7DA8;
+        }
 
 
         html[data-theme="dark"] {
@@ -182,8 +240,8 @@
             --splash-ink: #2c241c;
             --splash-ink-soft: #5c4f42;
             --splash-line: rgba(44, 36, 28, 0.12);
-            --splash-accent: #a67c52;
-            --splash-accent-deep: #8a6440;
+            --splash-accent: #EE8A4F;
+            --splash-accent-deep: #4C7DA8;
             position: fixed;
             inset: 0;
             z-index: 999999;
@@ -3893,6 +3951,9 @@
         }
         #theme-ocean {
             background: linear-gradient(135deg, #4A90E2, #2E5B9A);
+        }
+        #theme-xia-yizhou {
+            background: linear-gradient(135deg, #F5A063 0%, #EE8A4F 45%, #4C7DA8 100%);
         }
 
         .font-size-control {
