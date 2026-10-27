@@ -8,8 +8,11 @@ import android.content.pm.PackageManager;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.StatFs;
 import android.provider.Settings;
 import android.util.Base64;
+
+import org.json.JSONObject;
 import android.view.View;
 import android.view.Window;
 import android.view.WindowManager;
@@ -265,6 +268,19 @@ public class MainActivity extends Activity {
         @JavascriptInterface
         public boolean isNativePushSupported() {
             return true;
+        }
+
+        @JavascriptInterface
+        public String getStorageInfo() {
+            try {
+                StatFs stat = new StatFs(getFilesDir().getAbsolutePath());
+                JSONObject info = new JSONObject();
+                info.put("free", stat.getAvailableBytes());
+                info.put("total", stat.getTotalBytes());
+                return info.toString();
+            } catch (Throwable t) {
+                return "{}";
+            }
         }
 
         @JavascriptInterface
