@@ -6291,6 +6291,112 @@
             .push-panel-chip { flex:1 1 45%; }
         }
 
+        /* ===== WiFi 配对码面板 ===== */
+        .ah-sync-tabs {
+            display:flex; gap:8px; margin-bottom:16px;
+        }
+        .ah-sync-tab {
+            flex:1; padding:10px 14px; border-radius:12px; border:1.5px solid var(--border-color);
+            background:var(--primary-bg); color:var(--text-secondary); font-size:13px;
+            font-weight:600; cursor:pointer; font-family:var(--font-family);
+            display:flex; align-items:center; justify-content:center; gap:7px;
+            transition:all .2s ease;
+        }
+        .ah-sync-tab:hover { color:var(--text-primary); border-color:rgba(var(--accent-color-rgb),.5); }
+        .ah-sync-tab.active {
+            background:var(--accent-color); border-color:var(--accent-color); color:#fff;
+            box-shadow:0 3px 10px rgba(var(--accent-color-rgb),.28);
+        }
+
+        .ah-wifi-hint {
+            background:rgba(var(--accent-color-rgb),.06); padding:14px 16px; border-radius:12px;
+            border:1px dashed rgba(var(--accent-color-rgb),.25); font-size:12.5px;
+            color:var(--text-secondary); line-height:1.75; margin-bottom:18px;
+        }
+        .ah-wifi-hint i { margin-right:6px; color:var(--accent-color); }
+
+        .ah-wifi-section-title {
+            font-size:11.5px; font-weight:700; letter-spacing:.6px; text-transform:uppercase;
+            color:var(--text-secondary); margin:14px 0 10px; padding-left:2px;
+        }
+
+        .ah-wifi-btn {
+            width:100%; padding:13px 16px; border-radius:12px; font-size:13.5px;
+            font-family:var(--font-family); font-weight:600; cursor:pointer;
+            display:flex; align-items:center; justify-content:center; gap:9px;
+            transition:all .2s ease;
+        }
+        .ah-wifi-btn.primary {
+            background:var(--accent-color); color:#fff; border:none;
+            box-shadow:0 4px 14px rgba(var(--accent-color-rgb),.28);
+        }
+        .ah-wifi-btn.primary:hover { transform:translateY(-1px); box-shadow:0 6px 18px rgba(var(--accent-color-rgb),.36); }
+        .ah-wifi-btn.secondary {
+            background:var(--secondary-bg); color:var(--text-primary);
+            border:1.5px solid var(--border-color);
+        }
+        .ah-wifi-btn.secondary:hover { border-color:var(--accent-color); color:var(--accent-color); }
+
+        .ah-wifi-input {
+            width:100%; min-height:120px; padding:12px 14px; border:1.5px solid var(--border-color);
+            border-radius:12px; background:var(--secondary-bg); color:var(--text-primary);
+            font-size:12px; font-family:var(--font-family); resize:vertical; box-sizing:border-box;
+            line-height:1.7;
+        }
+        .ah-wifi-input:focus { outline:none; border-color:var(--accent-color); }
+
+        .ah-wifi-row { display:flex; gap:10px; margin-top:12px; align-items:center; }
+        .ah-wifi-row .ah-wifi-btn { width:auto; flex:1; }
+        .ah-wifi-pair {
+            flex:0 0 130px; padding:13px 14px; border:1.5px solid var(--border-color);
+            border-radius:12px; background:var(--secondary-bg); color:var(--text-primary);
+            font-size:22px; font-weight:700; text-align:center; font-family:var(--font-family);
+            letter-spacing:4px; outline:none;
+        }
+        .ah-wifi-pair:focus { border-color:var(--accent-color); }
+
+        .ah-wifi-pair-display {
+            text-align:center; padding:22px 16px;
+            background:linear-gradient(135deg, rgba(var(--accent-color-rgb),.12), rgba(var(--accent-color-rgb),.04));
+            border-radius:14px; border:1.5px solid rgba(var(--accent-color-rgb),.22); margin-bottom:12px;
+        }
+        .ah-wifi-pair-label {
+            font-size:11px; font-weight:700; letter-spacing:.8px; text-transform:uppercase;
+            color:var(--text-secondary); margin-bottom:6px;
+        }
+        .ah-wifi-pair-num {
+            font-size:38px; font-weight:800; letter-spacing:10px; color:var(--accent-color);
+            font-family:ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+        }
+        .ah-wifi-block-info {
+            font-size:11.5px; color:var(--text-secondary); margin-bottom:6px; padding-left:2px;
+        }
+        .ah-wifi-block-wrap { position:relative; margin-bottom:14px; }
+        .ah-wifi-block {
+            width:100%; min-height:90px; padding:10px 12px; border:1px solid var(--border-color);
+            border-radius:10px; background:var(--secondary-bg); color:var(--text-secondary);
+            font-size:10.5px; font-family:ui-monospace, Menlo, Consolas, monospace;
+            line-height:1.5; word-break:break-all; resize:vertical; box-sizing:border-box;
+            letter-spacing:.3px;
+        }
+        .ah-wifi-btn-row { display:flex; gap:10px; margin-top:6px; }
+        .ah-wifi-btn-row .ah-wifi-btn { flex:1; }
+
+        .ah-sync-row { margin-top:12px; }
+        .ah-sync-row .ah-wifi-btn { width:100%; }
+
+        .ah-sync-row-btn {
+            padding:10px 14px; border:1.5px solid var(--border-color); border-radius:10px;
+            background:var(--secondary-bg); color:var(--text-primary); cursor:pointer;
+            font-size:12.5px; font-family:var(--font-family);
+            display:flex; align-items:center; gap:7px;
+        }
+        .ah-sync-row-btn:hover { border-color:var(--accent-color); }
+
+        @media (max-width: 420px) {
+            .ah-wifi-pair { flex-basis:100px; font-size:18px; letter-spacing:3px; }
+        }
+
         .settings-footer {
             margin-top: 25px;
             padding: 20px;
