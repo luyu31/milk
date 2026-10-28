@@ -568,12 +568,21 @@ function _tryRecoverFromBackup() {
     }
 }
 
+// 批次 4 优化：messages 签名缓存，避免没改消息却每次都 JSON.stringify + IndexedDB 写
+var _lastSavedMsgsSig = '';
+
 const saveData = async () => {
     const __t0 = performance.now();
     if (!SESSION_ID) {
         console.warn('[saveData] SESSION_ID 尚未初始化，跳过保存以防数据写入临时 key');
         return;
     }
+
+    // 批次 4 优化 1：chatMessages 变化签名，避免数组没改却每次都做 JSON.stringify + IndexedDB 写
+    // 签名 = 长度 + 最后 3 条消息的 id 拼接（足够识别新增、删除、截断）
+    const _msgsSig = messages.length
+        + '|' + messages.slice(-3).map(m => String(m.id)).join(',');
+    const _msgsChanged = _msgsSig !== (_lastSavedMsgsSig || '');
 
     const promises = [
         { key: 'chatSettings',           val: () => localforage.setItem(getStorageKey('chatSettings'), settings) },
@@ -591,8 +600,11 @@ const saveData = async () => {
         { key: 'myStickerLibrary',       val: () => localforage.setItem(getStorageKey('myStickerLibrary'), myStickerLibrary) },
         { key: 'customThemes',           val: () => localforage.setItem(`${APP_PREFIX}customThemes`, customThemes) },
         { key: 'themeSchemes',           val: () => localforage.setItem(`${APP_PREFIX}themeSchemes`, themeSchemes) },
-        { key: 'chatMessages',           val: () => localforage.setItem(getStorageKey('chatMessages'), messages) },
     ];
+    // 批次 4 优化 2：chatMessages 只有变了才写（messages 可能有 data:image 内联，JSON.stringify 是重 CPU）
+    if (_msgsChanged) {
+        promises.push({ key: 'chatMessages', val: () => localforage.setItem(getStorageKey('chatMessages'), messages) });
+    }
 
     const partnerAvatarSrc = (() => {
         try {
@@ -631,6 +643,11 @@ const saveData = async () => {
             console.error(`[saveData] 保存失败: ${promises[i].key}`, r.reason);
         }
     });
+
+    // 批次 4 优化 3：成功跑完后记住当前签名，下次 saveData 对比用
+    if (_msgsChanged) {
+        _lastSavedMsgsSig = _msgsSig;
+    }
 
     if (failed.length > 0) {
         console.warn(`[saveData] ${failed.length} 项写入失败，已触发 localStorage 降级备份`, failed);
