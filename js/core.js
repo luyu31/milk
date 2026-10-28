@@ -569,6 +569,7 @@ function _tryRecoverFromBackup() {
 }
 
 const saveData = async () => {
+    const __t0 = performance.now();
     if (!SESSION_ID) {
         console.warn('[saveData] SESSION_ID 尚未初始化，跳过保存以防数据写入临时 key');
         return;
@@ -636,6 +637,10 @@ const saveData = async () => {
     }
 
     _backupCriticalData();
+
+    if (window.__AH_PERF__ && window.__AH_PERF__.isEnabled()) {
+        window.__AH_PERF__.mark('saveData', performance.now() - __t0);
+    }
 };
 
         function initializeRandomUI() {
@@ -1186,6 +1191,7 @@ function _updateReadReceiptsDOM() {
 }
 
 function renderMessages(preserveScroll = false) {
+    const __t0 = performance.now();
     const container = DOMElements.chatContainer;
     const totalMessages = messages.length;
     const startIndex = Math.max(0, totalMessages - displayedMessageCount);
@@ -1226,6 +1232,9 @@ function renderMessages(preserveScroll = false) {
         requestAnimationFrame(() => {
             container.scrollTop = container.scrollHeight;
         });
+    }
+    if (window.__AH_PERF__ && window.__AH_PERF__.isEnabled()) {
+        window.__AH_PERF__.mark('renderMessages', performance.now() - __t0);
     }
 }
 

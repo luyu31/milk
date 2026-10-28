@@ -1,3 +1,33 @@
+        // --- 可开关性能打点（用于批次优化前后对比） ---
+        // 使用方式：在控制台执行 __AH_PERF__.enable() 开启，__AH_PERF__.disable() 关闭
+        //          __AH_PERF__.report() 打印累计耗时报告
+        //          localStorage.setItem('ah_perf', '1') 可在下次启动时自动开启
+        (function initPerf() {
+            var enabled = false;
+            try { enabled = localStorage.getItem('ah_perf') === '1'; } catch (e) {}
+            var counts = Object.create(null);
+            var totals = Object.create(null);
+            window.__AH_PERF__ = {
+                isEnabled: function () { return enabled; },
+                enable: function () { enabled = true; try { localStorage.setItem('ah_perf', '1'); } catch (e) {} console.log('[AH_PERF] enabled'); },
+                disable: function () { enabled = false; try { localStorage.removeItem('ah_perf'); } catch (e) {} console.log('[AH_PERF] disabled'); },
+                reset: function () { counts = Object.create(null); totals = Object.create(null); },
+                mark: function (name, ms) {
+                    if (!enabled) return;
+                    counts[name] = (counts[name] || 0) + 1;
+                    totals[name] = (totals[name] || 0) + ms;
+                },
+                report: function () {
+                    var names = Object.keys(totals);
+                    if (!names.length) { console.log('[AH_PERF] 无数据'); return; }
+                    var rows = names.map(function (n) {
+                        return { name: n, count: counts[n], totalMs: totals[n], avgMs: totals[n] / counts[n] };
+                    }).sort(function (a, b) { return b.totalMs - a.totalMs; });
+                    console.table(rows);
+                }
+            };
+        })();
+
         function safeGetItem(key) {
             try { return localStorage.getItem(key); }
             catch (e) { console.error('Error getting item:', e); return null; }
