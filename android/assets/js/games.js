@@ -1528,6 +1528,7 @@ function initComboMenu() {
     }
 
     function drawWordCloud(canvas, words) {
+        var __t0 = performance.now();
         var ctx   = canvas.getContext('2d');
         var dpr   = window.devicePixelRatio || 1;
         ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
@@ -1589,6 +1590,9 @@ function initComboMenu() {
 
         var cx = W / 2, cy = H / 2;
 
+        // 批次 3 优化 1：连续 skip 计数，超过阈值说明画布已满 → 提前 break 外层
+        // （40 个词放不完，继续遍历更小词只会让时间爆掉）
+        var _skipStreak = 0;
         for (var idx = 0; idx < words.length; idx++) {
             var item = words[idx];
             var fs  = fontSize(item.count);
@@ -1606,8 +1610,9 @@ function initComboMenu() {
 
             var placed_ = false;
 
-            // 螺旋迭代次数减少约 45%，足够覆盖 40 个词的布局空间
-            for (var t = 0; t < 180; t += 0.12) {
+            // 批次 3 优化 2：螺旋步长从 0.12 → 0.14，迭代次数从 180 → 160，
+            // 每次少 11% 迭代。配合上面 skipStreak，实际快很多。
+            for (var t = 0; t < 160; t += 0.14) {
                 var ang = t * 2.2;
                 var r   = 1.8 * ang;
                 var bx  = cx + r * Math.cos(ang) * 1.2 - bw / 2;
@@ -1645,10 +1650,23 @@ function initComboMenu() {
                         ctx.fillText(item.word, fx, fy);
                         ctx.restore();
                         placed.push({ x: fx, y: fy, w: tw2, h: th2 });
+                        placed_ = true;
                         break;
                     }
                 }
             }
+
+            if (placed_) {
+                _skipStreak = 0;
+            } else {
+                _skipStreak++;
+                // 批次 3 优化 3：连续 3 个词放不进去 → 说明画布基本满了，提前结束
+                // （实际 40 词通常能放 35-38 个，连续 skip 基本不会出现）
+                if (_skipStreak >= 3) break;
+            }
+        }
+        if (window.__AH_PERF__ && window.__AH_PERF__.isEnabled()) {
+            window.__AH_PERF__.mark('drawWordCloud', performance.now() - __t0);
         }
     }
 
@@ -1764,11 +1782,22 @@ function initComboMenu() {
                 + '<span class="wc-summary-pill"><i class="fas fa-font"></i> ' + d.words.length + ' 词</span>';
         }
 
-        // canvas 绘制放到下一帧，避免阻塞 UI
+        // canvas 绘制放到空闲时，完全不阻塞任何用户交互
         var _pendingCanvasDraw = null;
         function scheduleCanvasDraw(canvas, words) {
-            if (_pendingCanvasDraw) cancelAnimationFrame(_pendingCanvasDraw);
-            _pendingCanvasDraw = requestAnimationFrame(function() {
+            if (_pendingCanvasDraw) {
+                // requestIdleCallback 用 cancelIdleCallback 取消
+                if (typeof cancelIdleCallback === 'function') cancelIdleCallback(_pendingCanvasDraw);
+                else clearTimeout(_pendingCanvasDraw);
+            }
+            var schedule = function (cb) {
+                if (typeof requestIdleCallback === 'function') {
+                    return requestIdleCallback(cb, { timeout: 2000 });
+                }
+                // WebView 可能没有 requestIdleCallback → 降级到 rAF（依然不阻塞当前帧）
+                return requestAnimationFrame(cb);
+            };
+            _pendingCanvasDraw = schedule(function() {
                 _pendingCanvasDraw = null;
                 drawWordCloud(canvas, words);
             });
