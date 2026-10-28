@@ -1206,22 +1206,30 @@ function renderMessages(preserveScroll = false) {
 
     const oldScrollHeight = container.scrollHeight;
     const oldScrollTop = container.scrollTop;
-    
-    container.innerHTML = '';
+
+    // 批次 2 优化 1：用 replaceChildren 清空 DOM，比 innerHTML='' 轻（不触发 HTML 解析）
+    if (typeof container.replaceChildren === 'function') {
+        container.replaceChildren();
+    } else {
+        while (container.firstChild) container.removeChild(container.firstChild);
+    }
 
     const fragment = new DocumentFragment();
-    
+
     const spacer = document.createElement('div');
     spacer.style.flex = '1';
     fragment.appendChild(spacer);
 
     let lastSenderRef = { current: null };
-    msgsToRender.forEach((msg, i) => {
+    // 批次 2 优化 2：for 循环代替 forEach（省闭包开销 + 早退出语义更清晰）
+    const N = msgsToRender.length;
+    for (let i = 0; i < N; i++) {
+        const msg = msgsToRender[i];
         const prevMsg = i > 0 ? msgsToRender[i - 1] : (startIndex > 0 ? messages[startIndex - 1] : null);
-        const nextMsg = i < msgsToRender.length - 1 ? msgsToRender[i + 1] : null;
-        const msgFragment = createMessageFragment(msg, prevMsg, nextMsg, lastSenderRef);
-        fragment.appendChild(msgFragment);
-    });
+        const nextMsg = i < N - 1 ? msgsToRender[i + 1] : null;
+        const frag = createMessageFragment(msg, prevMsg, nextMsg, lastSenderRef);
+        fragment.appendChild(frag);
+    }
 
     container.appendChild(fragment);
 
