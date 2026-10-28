@@ -27,6 +27,9 @@
         connectingTimer: null,
         randomCallTimer: null,
         isPartnerCall:   false,
+        endReason:       null,   // 'user-hangup' | 'partner-busy' | 'partner-missed' | 'auto-quit' | 'incoming-missed' | 'incoming-rejected'
+        startedAt:       null,   // 通话开始的精确时间戳（第一次进入 startCall 时）
+        outgoingLogged:  false,  // 发起/来电提示是否已记过
     };
 
     const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
@@ -576,10 +579,37 @@ html:not([data-theme="dark"])[data-color-theme="black-white"] .message-sent{
         sendCallEvent('fa-video', '视频通话已结束', fmt(dur));
     }
 
+    function logCallStage(opts) {
+        // opts: { stage, direction, label, detail, icon }
+        // stage: 'outgoing-start' | 'incoming' | 'accepted' | 'ended' | 'failed' | 'missed' | 'rejected' | 'auto-quit'
+        // direction: 'inbound' | 'outbound' | null
+        // 同时挂在 _addCallEvent 和新版 _addCallEventV2
+        const call = () => {
+            if (typeof window._addCallEvent === 'function') {
+                window._addCallEvent(
+                    opts.icon || 'fa-video',
+                    opts.label,
+                    opts.detail || null,
+                    { stage: opts.stage, direction: opts.direction }
+                );
+                return true;
+            }
+            return false;
+        };
+        if (!call()) {
+            let tries = 0;
+            const t = setInterval(() => {
+                if (call() || ++tries > 30) clearInterval(t);
+            }, 200);
+        }
+    }
+
     function startCall(isPartner) {
         if (!S.enabled) return;
         S.active = true; S.startTime = null; S.elapsed = 0;
         S.minimized = false; S.isPartnerCall = !!isPartner; S.immersive = false;
+        S.startedAt = Date.now();
+        S.endReason = null;
         document.getElementById('call-window')?.classList.remove('immersive');
 
         ['call-inc-avatar','call-conn-avatar','call-win-avatar','call-mini-av'].forEach(fillAv);
@@ -596,6 +626,17 @@ html:not([data-theme="dark"])[data-color-theme="black-white"] .message-sent{
         if (timerEl) timerEl.textContent = '连接中';
 
         clearTimeout(S.connectingTimer);
+
+        // 发起方（outbound）记录"你发起了视频通话"
+        if (!isPartner && !S.outgoingLogged) {
+            S.outgoingLogged = true;
+            logCallStage({
+                stage: 'outgoing-start',
+                direction: 'outbound',
+                icon: 'fa-video',
+                label: '你发起了视频通话',
+            });
+        }
 
         if (!isPartner && Math.random() < 0.35) {
             const rejectDelay = 4000 + Math.random() * 8000;
@@ -616,7 +657,12 @@ html:not([data-theme="dark"])[data-color-theme="black-white"] .message-sent{
                     getName() + ' 暂时无法接听',
                 ];
                 const lbl = rejectLabels[Math.floor(Math.random() * rejectLabels.length)];
-                sendCallEvent('fa-phone-slash', lbl, null);
+                logCallStage({
+                    stage: 'missed',
+                    direction: 'outbound',
+                    icon: 'fa-phone-slash',
+                    label: lbl,
+                });
                 if (typeof showNotification === 'function')
                     showNotification(lbl, 'info', 3000);
             }, rejectDelay);
@@ -631,9 +677,13 @@ html:not([data-theme="dark"])[data-color-theme="black-white"] .message-sent{
         }
     }
 
-    function endCall() {
-        if (!S.active) return;
+    function endCall(reason) {
+        if (!S.active && reason !== 'auto-quit') return;
+        // 在关闭任何状态之前先抓快照
         const dur = S.elapsed;
+        const wasActive = S.active;
+        const hasConnected = S.startTime !== null;
+
         S.active = false; S.startTime = null;
         cancelAnimationFrame(S.timerRAF);
         clearTimeout(S.connectingTimer); clearTimeout(S.incomingTimer);
@@ -652,11 +702,45 @@ html:not([data-theme="dark"])[data-color-theme="black-white"] .message-sent{
 
         localStorage.setItem(KEY_POS,  JSON.stringify(S.pos));
         localStorage.setItem(KEY_SIZE, JSON.stringify(S.size));
-        sendCallMsg(dur);
-        if (typeof showNotification === 'function' && dur > 1500)
-            showNotification(`通话结束 · ${fmt(dur)}`, 'info', 3000);
-        else if (typeof showNotification === 'function' && dur <= 1500 && dur > 0)
-            showNotification('通话已挂断', 'info', 2000);
+
+        // 统一记录：不管时长多少都记（未接通也有记录）
+        if (wasActive) {
+            const d = dur;
+            if (reason === 'auto-quit') {
+                logCallStage({
+                    stage: 'auto-quit',
+                    direction: null,
+                    icon: 'fa-video',
+                    label: '因退出应用，视频通话自动挂断',
+                    detail: hasConnected && d > 0 ? fmt(d) : null,
+                });
+                if (typeof showNotification === 'function')
+                    showNotification('视频通话已自动挂断', 'info', 2500);
+            } else if (hasConnected) {
+                // 只要真正接通过，哪怕秒挂也是 ended
+                logCallStage({
+                    stage: 'ended',
+                    direction: null,
+                    icon: 'fa-video',
+                    label: '视频通话结束',
+                    detail: d > 0 ? fmt(d) : null,
+                });
+                if (typeof showNotification === 'function')
+                    showNotification(d > 0 ? `通话结束 · ${fmt(d)}` : '通话已结束', 'info', 3000);
+            } else {
+                // 还在连接中就挂断
+                logCallStage({
+                    stage: 'failed',
+                    direction: null,
+                    icon: 'fa-phone-slash',
+                    label: '视频通话已取消',
+                    detail: null,
+                });
+                if (typeof showNotification === 'function')
+                    showNotification('视频通话已取消', 'info', 2000);
+            }
+        }
+        S.outgoingLogged = false;
     }
 
     function showIncomingCall() {
@@ -667,6 +751,15 @@ html:not([data-theme="dark"])[data-color-theme="black-white"] .message-sent{
         ov.classList.add('visible');
         clearTimeout(S.incomingTimer);
 
+        // 来电提示一出现就记一条
+        S.outgoingLogged = true; // 防止用户先点发起再 auto-reject 时重复记录
+        logCallStage({
+            stage: 'incoming',
+            direction: 'inbound',
+            icon: 'fa-video',
+            label: '对方发起了视频通话',
+        });
+
         const autoRejectChance = 0.30;
         if (Math.random() < autoRejectChance) {
             const rejectDelay = 4000 + Math.random() * 6000;
@@ -676,20 +769,30 @@ html:not([data-theme="dark"])[data-color-theme="black-white"] .message-sent{
                 const myName = (typeof settings !== 'undefined' && settings.myName) || '我';
                 const partnerName = getName();
                 const rejectLabels = [
-                    `${partnerName} 的来电，${myName}未接听`,
+                    `${myName}未接听 ${partnerName} 的来电`,
                     `${myName}拒绝了 ${partnerName} 的通话`,
                     `错过了 ${partnerName} 的来电`,
                     `${myName}暂时无法接听 ${partnerName} 的通话`,
                 ];
                 const label = rejectLabels[Math.floor(Math.random() * rejectLabels.length)];
-                sendCallEvent('fa-phone-slash', label, null);
+                logCallStage({
+                    stage: 'missed',
+                    direction: 'inbound',
+                    icon: 'fa-phone-slash',
+                    label: label,
+                });
             }, rejectDelay);
         } else {
             S.incomingTimer = setTimeout(() => {
                 if (!ov.classList.contains('visible')) return;
                 ov.classList.remove('visible');
                 const myName = (typeof settings !== 'undefined' && settings.myName) || '我';
-                sendCallEvent('fa-phone-slash', `${myName}未接听 ${getName()} 的来电`, null);
+                logCallStage({
+                    stage: 'missed',
+                    direction: 'inbound',
+                    icon: 'fa-phone-slash',
+                    label: `${myName}未接听 ${getName()} 的来电`,
+                });
             }, 22000);
         }
     }
@@ -831,14 +934,26 @@ html:not([data-theme="dark"])[data-color-theme="black-white"] .message-sent{
             document.getElementById('call-incoming-overlay')?.classList.remove('visible');
             clearTimeout(S.incomingTimer);
             const myName = (typeof settings !== 'undefined' && settings.myName) || '我';
-            sendCallEvent('fa-phone-slash', `${myName}拒绝了 ${getName()} 的通话`, null);
+            logCallStage({
+                stage: 'rejected',
+                direction: 'outbound',
+                icon: 'fa-phone-slash',
+                label: `${myName}拒绝了 ${getName()} 的通话`,
+            });
         });
         document.getElementById('call-inc-accept')?.addEventListener('click', () => {
             document.getElementById('call-incoming-overlay')?.classList.remove('visible');
-            clearTimeout(S.incomingTimer); startCall(true);
+            clearTimeout(S.incomingTimer);
+            logCallStage({
+                stage: 'accepted',
+                direction: 'inbound',
+                icon: 'fa-phone',
+                label: '你接听了视频通话',
+            });
+            startCall(true);
         });
 
-        document.getElementById('call-hangup-btn')?.addEventListener('click', endCall);
+        document.getElementById('call-hangup-btn')?.addEventListener('click', () => endCall());
         document.getElementById('call-mini-hangup')?.addEventListener('click', e => { e.stopPropagation(); endCall(); });
         document.getElementById('call-minimize-btn')?.addEventListener('click', minimizeWindow);
         document.getElementById('call-mini-pill')?.addEventListener('click', e => {
@@ -899,6 +1014,16 @@ html:not([data-theme="dark"])[data-color-theme="black-white"] .message-sent{
         injectHTML();
         bindEvents();
         loadBg();
+
+        // 退出/隐藏时自动挂断并留下记录
+        const autoQuitHandler = () => {
+            if (S.active) endCall('auto-quit');
+        };
+        document.addEventListener('visibilitychange', () => {
+            if (document.visibilityState === 'hidden') autoQuitHandler();
+        });
+        window.addEventListener('pagehide', autoQuitHandler);
+        // Android WebView 中 beforeunload 不一定触发，visibilitychange/pagehide 更可靠
 
         const late = () => {
             injectToolbarBtn();

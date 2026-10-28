@@ -1503,17 +1503,67 @@
             animation: systemMsgPop 0.4s cubic-bezier(0.34,1.56,0.64,1) forwards;
             opacity: 0;
             transform: scale(0.9) translateY(4px);
+            max-width: 100%;
+        }
+        /* 方向小标签 */
+        .call-event-dir {
+            font-size: 10px;
+            font-weight: 600;
+            padding: 1px 6px;
+            border-radius: 10px;
+            line-height: 1.4;
+            letter-spacing: 0.3px;
+            flex-shrink: 0;
+        }
+        .call-event-dir--out {
+            background: rgba(76, 175, 80, 0.14);
+            color: rgba(76, 175, 80, 0.9);
+            border: 1px solid rgba(76, 175, 80, 0.28);
+        }
+        .call-event-dir--in {
+            background: rgba(33, 150, 243, 0.14);
+            color: rgba(33, 150, 243, 0.9);
+            border: 1px solid rgba(33, 150, 243, 0.28);
+        }
+
+        /* 各阶段颜色 */
+        .call-event-pill--outgoing {
+            background: rgba(76, 175, 80, 0.06);
+            border-color: rgba(76, 175, 80, 0.22);
+            color: rgba(76, 175, 80, 0.92);
+        }
+        .call-event-pill--incoming {
+            background: rgba(33, 150, 243, 0.06);
+            border-color: rgba(33, 150, 243, 0.22);
+            color: rgba(33, 150, 243, 0.92);
+        }
+        .call-event-pill--accepted {
+            background: rgba(var(--accent-color-rgb, 180,140,100), 0.08);
+            border-color: rgba(var(--accent-color-rgb, 180,140,100), 0.22);
+            color: var(--text-primary);
         }
         .call-event-pill--ended {
             background: rgba(var(--accent-color-rgb, 180,140,100), 0.06);
             border-color: rgba(var(--accent-color-rgb, 180,140,100), 0.18);
             color: var(--text-secondary);
         }
+        .call-event-pill--failed {
+            background: rgba(158, 158, 158, 0.08);
+            border-color: rgba(158, 158, 158, 0.24);
+            color: rgba(158, 158, 158, 0.92);
+        }
+        .call-event-pill--missed,
         .call-event-pill--rejected {
             background: rgba(255, 80, 80, 0.06);
             border-color: rgba(255, 80, 80, 0.2);
             color: rgba(255, 80, 80, 0.75);
         }
+        .call-event-pill--autoquit {
+            background: rgba(255, 152, 0, 0.08);
+            border-color: rgba(255, 152, 0, 0.24);
+            color: rgba(255, 152, 0, 0.9);
+        }
+
         .call-event-icon {
             font-size: 11px;
             opacity: 0.75;

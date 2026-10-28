@@ -968,10 +968,28 @@ function createMessageFragment(msg, prevMsg, nextMsg, lastSenderRef) {
         callEvDiv.className = 'call-event-message';
         callEvDiv.dataset.id = msg.id;
         const icon = msg.callIcon || 'fa-video';
-        const isRejected = icon === 'fa-phone-slash';
-        const colorClass = isRejected ? 'call-event-pill--rejected' : 'call-event-pill--ended';
+        const stage = msg.callStage || null;
+        const dir = msg.callDirection || null;
+
+        // 按阶段决定颜色 class + 方向标签
+        let colorClass = 'call-event-pill--ended'; // 默认"通话结束"
+        let dirMark = '';
+        switch (stage) {
+            case 'outgoing-start':   colorClass = 'call-event-pill--outgoing'; dirMark = '<span class="call-event-dir call-event-dir--out">我呼出</span>'; break;
+            case 'incoming':         colorClass = 'call-event-pill--incoming'; dirMark = '<span class="call-event-dir call-event-dir--in">对方来电</span>'; break;
+            case 'accepted':         colorClass = 'call-event-pill--accepted'; dirMark = '<span class="call-event-dir call-event-dir--in">已接听</span>'; break;
+            case 'ended':            colorClass = 'call-event-pill--ended'; break;
+            case 'failed':           colorClass = 'call-event-pill--failed'; break;
+            case 'missed':           colorClass = 'call-event-pill--missed'; dirMark = dir === 'outbound' ? '<span class="call-event-dir call-event-dir--out">未接通</span>' : '<span class="call-event-dir call-event-dir--in">未接来电</span>'; break;
+            case 'rejected':         colorClass = 'call-event-pill--rejected'; break;
+            case 'auto-quit':        colorClass = 'call-event-pill--autoquit'; break;
+            default:
+                // 兼容旧消息：用图标推断
+                if (icon === 'fa-phone-slash') colorClass = 'call-event-pill--missed';
+        }
+
         const detail = msg.callDetail ? `<span class="call-event-detail">${msg.callDetail}</span>` : '';
-        callEvDiv.innerHTML = `<div class="call-event-pill ${colorClass}"><i class="fas ${icon} call-event-icon"></i><span class="call-event-label">${msg.text.replace(/ · .*/, '')}</span>${detail}<button class="call-event-delete" title="删除" onclick="(function(btn){const id=btn.closest('[data-id]').dataset.id;const idx=messages.findIndex(m=>String(m.id)===String(id));if(idx>-1){messages.splice(idx,1);renderMessages();throttledSaveData();}})(this)"><i class="fas fa-times"></i></button></div>`;
+        callEvDiv.innerHTML = `<div class="call-event-pill ${colorClass}">${dirMark}<i class="fas ${icon} call-event-icon"></i><span class="call-event-label">${msg.text.replace(/ · .*/, '')}</span>${detail}<button class="call-event-delete" title="删除" onclick="(function(btn){const id=btn.closest('[data-id]').dataset.id;const idx=messages.findIndex(m=>String(m.id)===String(id));if(idx>-1){messages.splice(idx,1);renderMessages();throttledSaveData();}})(this)"><i class="fas fa-times"></i></button></div>`;
         fragment.appendChild(callEvDiv);
         lastSenderRef.current = 'system';
         return fragment;
@@ -1262,16 +1280,19 @@ const addMessage = (message) => {
     throttledSaveData();
 };
 
-        window._addCallEvent = (icon, label, detail) => {
+        window._addCallEvent = (icon, label, detail, opts) => {
+            opts = opts || {};
             addMessage({
                 id: Date.now() + Math.random(),
                 sender: 'system',
-                text: label + (detail ? ' · ' + detail : ''),
+                text: label + (detail && typeof detail === 'string' ? ' · ' + detail : ''),
                 timestamp: new Date(),
                 status: 'received',
                 type: 'call-event',
                 callIcon: icon || 'fa-video',
                 callDetail: detail || null,
+                callStage: opts.stage || null,
+                callDirection: opts.direction || null,
                 favorited: false,
                 note: null,
             });
