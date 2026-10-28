@@ -11195,3 +11195,212 @@
             border-color: var(--accent-color) !important;
             outline: none;
         }
+
+/* ============================================================
+ * 夏日白昼（SummerDaylight）—— 可选叠加层
+ * 触发条件：html[data-summer="1"]
+ * 默认不启用，覆盖层只修改 CSS 变量，不动原有任何样式。
+ * 关闭时只需移除 data-summer 属性，原主题 100% 生效。
+ * ============================================================ */
+
+html[data-summer="1"] {
+    /* 语义 token */
+    --summer-bg:            #F7FAF5;
+    --summer-surface:       #FFFFFF;
+    --summer-primary:       #7FB069;     /* 青苹果绿 */
+    --summer-primary-hover: #6FA05B;
+    --summer-secondary:     #A8D5BA;
+    --summer-accent:        #F2C14E;     /* 暖黄点缀 */
+    --summer-text:          #2F3E2E;
+    --summer-text-secondary: #6B7A6A;
+    --summer-divider:       #E3EBE0;
+    --summer-danger:        #E07A5F;
+    --summer-radius-card:   16px;
+    --summer-radius-btn:    12px;
+
+    /* 覆盖到项目已有的全局 token */
+    --accent-color:         var(--summer-primary);
+    --accent-color-hover:   var(--summer-primary-hover);
+    --accent-color-dark:    #5F9151;
+    --accent-color-rgb:     127, 176, 105;
+
+    --text-primary:         var(--summer-text);
+    --text-secondary:       var(--summer-text-secondary);
+
+    /* 聊天气泡 */
+    --message-sent-bg:      #EAF4E4;     /* 自己 */
+    --message-received-bg:  #FFFFFF;     /* 对方 */
+
+    /* 背景类 */
+    --bg-page:              var(--summer-bg);
+    --bg-chat:              var(--summer-bg);
+    --bg-surface:           var(--summer-surface);
+
+    /* 工具栏 */
+    --toolbar-btn-bg:       #EFF5EA;
+}
+
+/* 深色 + 夏日白昼叠加 */
+html[data-theme="dark"][data-summer="1"] {
+    --summer-bg:            #1E2A1D;
+    --summer-surface:       #273526;
+    --summer-primary:       #9BC98A;
+    --summer-primary-hover: #8AB878;
+    --summer-secondary:     #556E4E;
+    --summer-accent:        #F2C14E;
+    --summer-text:          #E8F0E4;
+    --summer-text-secondary:#9AA894;
+    --summer-divider:       #374A35;
+
+    --accent-color:         var(--summer-primary);
+    --accent-color-hover:   var(--summer-primary-hover);
+    --accent-color-dark:    #7AAA68;
+    --accent-color-rgb:     155, 201, 138;
+
+    --text-primary:         var(--summer-text);
+    --text-secondary:       var(--summer-text-secondary);
+
+    --message-sent-bg:      #32482F;
+    --message-received-bg:  #2D3D2A;
+    --toolbar-btn-bg:       #2D3D2A;
+}
+
+/* 气泡边框：原项目浅色下对方气泡无 border，夏日白昼加一层淡色区分 */
+html[data-summer="1"] .message-received,
+html[data-summer="1"] .message.message-received {
+    border: 1px solid var(--summer-divider);
+}
+/* 深色下对方气泡加一点区分 */
+html[data-theme="dark"][data-summer="1"] .message-received,
+html[data-theme="dark"][data-summer="1"] .message.message-received {
+    border: 1px solid var(--summer-divider);
+}
+
+/* 时间戳 tabular-nums（用户指定） */
+html[data-summer="1"] .message-time,
+html[data-summer="1"] .message-timestamp {
+    font-variant-numeric: tabular-nums;
+}
+
+/* 苹果图标小装饰：空状态 / 通话记录前置 */
+html[data-summer="1"] .empty-state-icon,
+html[data-summer="1"] .empty-state svg,
+html[data-summer="1"] .empty-state i {
+    color: var(--summer-primary) !important;
+    opacity: 0.78;
+}
+
+/* 卡片 / 面板视觉：夏日白昼下加一点圆角和柔和阴影 */
+html[data-summer="1"] .chat-panel,
+html[data-summer="1"] .settings-card {
+    border-radius: var(--summer-radius-card);
+    box-shadow: 0 2px 10px rgba(127,176,105,0.06);
+}
+
+/* 苹果小屋封面：夏日白昼下 accent 色覆盖 */
+html[data-summer="1"] .applehut-cover-heart,
+html[data-summer="1"] .applehut-cover .applehut-cover-heart {
+    color: var(--summer-primary) !important;
+}
+
+/* 动效：遵守 prefers-reduced-motion */
+html[data-summer="1"] * {
+    transition: background-color 150ms ease, color 150ms ease, border-color 150ms ease;
+}
+@media (prefers-reduced-motion: reduce) {
+    html[data-summer="1"] * {
+        transition: none !important;
+        animation: none !important;
+    }
+}
+
+/* 来电图标呼吸（1.2s 缩放）—— 夏日白昼专用 */
+html[data-summer="1"] .call-inc-ring::before {
+    animation-duration: 1.2s;
+    animation-timing-function: ease-in-out;
+}
+
+/* 夏日白昼设置卡片（不依赖 data-summer，开关的 UI 始终可点） */
+.summer-daylight-card {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 14px 16px;
+    border-radius: 14px;
+    border: 1px solid var(--divider, rgba(0,0,0,0.08));
+    background: var(--bg-surface, var(--message-received-bg, #fff));
+    cursor: pointer;
+    transition: border-color 150ms ease, box-shadow 150ms ease, transform 150ms ease;
+    outline: none;
+}
+.summer-daylight-card:hover {
+    border-color: var(--accent-color);
+    box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+}
+.summer-daylight-card:focus-visible {
+    border-color: var(--accent-color);
+    box-shadow: 0 0 0 3px rgba(127,176,105,0.25);
+}
+.summer-daylight-card.summer-active {
+    border-color: #7FB069;
+    box-shadow: 0 0 0 3px rgba(127,176,105,0.18), 0 2px 10px rgba(127,176,105,0.10);
+}
+.summer-daylight-card.summer-active .summer-info-title { color: var(--accent-color); }
+
+.summer-preview {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 6px 8px;
+    border-radius: 10px;
+    background: linear-gradient(180deg, #F7FAF5 0%, #FFFFFF 100%);
+    border: 1px solid rgba(0,0,0,0.08);
+    flex-shrink: 0;
+}
+html[data-theme="dark"] .summer-preview {
+    background: linear-gradient(180deg, #1E2A1D 0%, #273526 100%);
+    border-color: rgba(255,255,255,0.10);
+}
+.summer-preview-dot {
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    display: inline-block;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.25), 0 1px 2px rgba(0,0,0,0.10);
+}
+.summer-dot-green  { background: #7FB069; }
+.summer-dot-yellow { background: #F2C14E; }
+.summer-dot-white  { background: #FFFFFF; border: 1px solid rgba(0,0,0,0.12); box-shadow: none; }
+
+.summer-preview-divider {
+    width: 1px; height: 28px;
+    background: var(--divider, rgba(0,0,0,0.08));
+    flex-shrink: 0;
+}
+
+.summer-info {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    min-width: 0;
+}
+.summer-info-title {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text-primary);
+    line-height: 1.2;
+}
+.summer-info-desc {
+    font-size: 11.5px;
+    color: var(--text-secondary);
+    opacity: 0.85;
+}
+
+html[data-theme="dark"] .summer-daylight-card {
+    border-color: rgba(255,255,255,0.08);
+}
+html[data-theme="dark"] .summer-daylight-card.summer-active {
+    border-color: #9BC98A;
+    box-shadow: 0 0 0 3px rgba(155,201,138,0.25), 0 2px 10px rgba(155,201,138,0.10);
+}
