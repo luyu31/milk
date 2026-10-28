@@ -10648,12 +10648,29 @@
         }
 
         #wordcloud-panel {
+            flex: 1;
+            min-height: 0;
             overflow-y: auto;
-            max-height: 72vh;
             padding: 6px 0 16px;
             scrollbar-width: none;
         }
         #wordcloud-panel::-webkit-scrollbar { display: none; }
+
+        #search-panel {
+            flex: 1;
+            min-height: 0;
+            overflow-y: auto;
+            scrollbar-width: none;
+        }
+        #search-panel::-webkit-scrollbar { display: none; }
+
+        #favorites-panel {
+            flex: 1;
+            min-height: 0;
+            overflow-y: auto;
+            scrollbar-width: none;
+        }
+        #favorites-panel::-webkit-scrollbar { display: none; }
 
         #wordcloud-container {
             display: flex;

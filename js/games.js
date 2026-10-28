@@ -1416,7 +1416,16 @@ function initComboMenu() {
         '图片','表情','语音','【图片】','【表情】','【语音】','撤回了一条消息','已撤回'
     ]);
 
+    // —— 缓存：避免每次打开词云都重新扫全量消息 ——
+    var _wcTextCache = Object.create(null);   // 单条文本分词缓存
+    var _wcAggCache  = null;                  // 聚合词频缓存对象
+    var _wcAggSig    = '';                    // 缓存签名：消息数 + 最后20条id
+
     function tokenize(text) {
+        if (!text) return {};
+        var hit = _wcTextCache[text];
+        if (hit) return hit;
+
         text = text
             .replace(/https?:\/\/\S+/g, '')
             .replace(/\[.*?\]/g, '')
@@ -1425,20 +1434,16 @@ function initComboMenu() {
             .toLowerCase();
         var words = {};
         var cn = text.replace(/[a-z ]/g, '');
-        // 使用非重叠分词：优先提取长词，避免"我想你"同时产生"我想"和"想你"
-        // 策略：对每个起点只取一次最长匹配（4>3>2），跳过已覆盖字符
         var covered = new Array(cn.length).fill(false);
-        // 先扫一遍提取4字词
         for (var i = 0; i + 4 <= cn.length; i++) {
             var w4 = cn.slice(i, i + 4);
             if (!STOP_WORDS.has(w4)) {
                 words[w4] = (words[w4] || 0) + 2.4;
                 covered[i] = covered[i+1] = covered[i+2] = covered[i+3] = true;
-                i += 3; // 跳过已覆盖字符
+                i += 3;
             }
         }
-        // 再扫3字词（跳过已覆盖位置）
-        covered = new Array(cn.length).fill(false); // 重置，用于3字
+        covered = new Array(cn.length).fill(false);
         for (var j = 0; j + 3 <= cn.length; j++) {
             var w3 = cn.slice(j, j + 3);
             if (!STOP_WORDS.has(w3)) {
@@ -1446,42 +1451,63 @@ function initComboMenu() {
                 j += 2;
             }
         }
-        // 2字词：步长2，非重叠，不与已有词重复计数
         for (var k = 0; k + 2 <= cn.length; k += 2) {
             var w2 = cn.slice(k, k + 2);
             if (!STOP_WORDS.has(w2)) {
                 words[w2] = (words[w2] || 0) + 1;
             }
         }
-        // 英文单词（长度≥3）
         (text.match(/[a-z]{3,}/g) || []).forEach(function(w) {
             if (!STOP_WORDS.has(w)) words[w] = (words[w] || 0) + 1;
         });
+
+        // 限制缓存大小，避免内存泄漏
+        if (Object.keys(_wcTextCache).length > 400) {
+            _wcTextCache = Object.create(null);
+        }
+        _wcTextCache[text] = words;
         return words;
     }
 
     function mergeFreq(a, b) {
         var o = Object.assign({}, a);
-        Object.keys(b).forEach(function(k) { o[k] = (o[k] || 0) + b[k]; });
+        var keys = Object.keys(b);
+        for (var i = 0; i < keys.length; i++) {
+            o[keys[i]] = (o[keys[i]] || 0) + b[keys[i]];
+        }
         return o;
     }
 
     function topWords(freq, n) {
-        var min = Object.keys(freq).length > 60 ? 2 : 1;
-        return Object.entries(freq)
-            .filter(function(e) { return e[1] >= min && e[0].length >= 2; })
-            .sort(function(a, b) { return b[1] - a[1]; })
-            .slice(0, n)
-            .map(function(e) { return { word: e[0], count: e[1] }; });
+        var keys = Object.keys(freq);
+        var min = keys.length > 60 ? 2 : 1;
+        var entries = new Array(keys.length);
+        for (var i = 0; i < keys.length; i++) {
+            entries[i] = [keys[i], freq[keys[i]]];
+        }
+        // 内联 filter + sort
+        entries = entries.filter(function(e) { return e[1] >= min && e[0].length >= 2; });
+        entries.sort(function(a, b) { return b[1] - a[1]; });
+        if (entries.length > n) entries.length = n;
+        for (var j = 0; j < entries.length; j++) {
+            entries[j] = { word: entries[j][0], count: entries[j][1] };
+        }
+        return entries;
     }
 
+    // —— 常量缓存 ——
+    var _wcFont = null;
+    var _wcAccentKey = '';
+    var _wcAccentRgb = null;
+
     function resolveFont() {
+        if (_wcFont) return _wcFont;
         var el = document.createElement('span');
         el.style.cssText = 'position:absolute;visibility:hidden;font-family:var(--font-family)';
         document.body.appendChild(el);
-        var f = getComputedStyle(el).fontFamily || '"PingFang SC","Microsoft YaHei",sans-serif';
+        _wcFont = getComputedStyle(el).fontFamily || '"PingFang SC","Microsoft YaHei",sans-serif';
         document.body.removeChild(el);
-        return f;
+        return _wcFont;
     }
 
     function hex3(hex) {
@@ -1490,6 +1516,17 @@ function initComboMenu() {
         var n = parseInt(hex, 16);
         return [(n>>16)&255, (n>>8)&255, n&255];
     }
+
+    function getAccentRgb() {
+        var cs = getComputedStyle(document.documentElement);
+        var accent = cs.getPropertyValue('--accent-color').trim() || '#c5a47e';
+        if (_wcAccentKey !== accent) {
+            _wcAccentKey = accent;
+            _wcAccentRgb = hex3(accent);
+        }
+        return _wcAccentRgb;
+    }
+
     function drawWordCloud(canvas, words) {
         var ctx   = canvas.getContext('2d');
         var dpr   = window.devicePixelRatio || 1;
@@ -1497,10 +1534,8 @@ function initComboMenu() {
         var W = canvas.width / dpr;
         var H = canvas.height / dpr;
 
-        var cs     = getComputedStyle(document.documentElement);
-        var accent = cs.getPropertyValue('--accent-color').trim() || '#c5a47e';
         var isDark = document.documentElement.getAttribute('data-theme') === 'dark';
-        var rgb    = hex3(accent);
+        var rgb    = getAccentRgb();
         var font   = resolveFont();
 
         ctx.fillStyle = isDark ? '#141414' : '#ffffff';
@@ -1535,6 +1570,7 @@ function initComboMenu() {
             return (Math.abs(h) % 6 === 0) ? (Math.PI / 2) : 0;
         }
 
+        // 内联 overlaps，减少函数调用开销
         function overlaps(x, y, w, h, pad) {
             for (var i = 0; i < placed.length; i++) {
                 var p = placed[i];
@@ -1544,11 +1580,17 @@ function initComboMenu() {
             return false;
         }
 
+        // 颜色字符串一次算好
+        var rgbStr = 'rgb(' + rgb[0] + ',' + rgb[1] + ',' + rgb[2] + ')';
+
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
         ctx.shadowBlur = 0;
 
-        words.forEach(function(item, idx) {
+        var cx = W / 2, cy = H / 2;
+
+        for (var idx = 0; idx < words.length; idx++) {
+            var item = words[idx];
             var fs  = fontSize(item.count);
             var fw  = idx < 2 ? '800' : idx < 8 ? '600' : '400';
             var rot = tilt(item.word, idx);
@@ -1563,9 +1605,9 @@ function initComboMenu() {
             var pad = idx < 3 ? 9 : idx < 12 ? 4 : 2;
 
             var placed_ = false;
-            var cx = W / 2, cy = H / 2;
 
-            for (var t = 0; t < 320; t += 0.09) {
+            // 螺旋迭代次数减少约 45%，足够覆盖 40 个词的布局空间
+            for (var t = 0; t < 180; t += 0.12) {
                 var ang = t * 2.2;
                 var r   = 1.8 * ang;
                 var bx  = cx + r * Math.cos(ang) * 1.2 - bw / 2;
@@ -1575,7 +1617,7 @@ function initComboMenu() {
                     if (!overlaps(bx, by, bw, bh, pad)) {
                         ctx.save();
                         ctx.globalAlpha = a;
-                        ctx.fillStyle = 'rgb(' + rgb[0] + ',' + rgb[1] + ',' + rgb[2] + ')';
+                        ctx.fillStyle = rgbStr;
                         ctx.translate(bx + bw/2, by + bh/2);
                         ctx.rotate(rot);
                         ctx.fillText(item.word, 0, 0);
@@ -1592,13 +1634,13 @@ function initComboMenu() {
                 ctx.font = '400 ' + fsS + 'px ' + font;
                 var tw2 = ctx.measureText(item.word).width + 2;
                 var th2 = fsS * 1.25;
-                for (var fb = 0; fb < 60; fb++) {
+                for (var fb = 0; fb < 30; fb++) {
                     var fx = 6 + Math.random() * (W - tw2 - 12);
                     var fy = 6 + Math.random() * (H - th2 - 12);
                     if (!overlaps(fx, fy, tw2, th2, 2)) {
                         ctx.save();
                         ctx.globalAlpha = Math.min(a, 0.32);
-                        ctx.fillStyle = 'rgb(' + rgb[0] + ',' + rgb[1] + ',' + rgb[2] + ')';
+                        ctx.fillStyle = rgbStr;
                         ctx.textAlign = 'left'; ctx.textBaseline = 'top';
                         ctx.fillText(item.word, fx, fy);
                         ctx.restore();
@@ -1607,8 +1649,63 @@ function initComboMenu() {
                     }
                 }
             }
-        });
+        }
     }
+
+    // —— 聚合词频（带签名缓存） ——
+    function computeAggCache() {
+        if (typeof messages === 'undefined' || !messages || !messages.length) {
+            _wcAggCache = null;
+            _wcAggSig = '';
+            return null;
+        }
+        // 签名：消息数 + 最后 20 条的 id 拼接（兼顾准确性和性能）
+        var n = messages.length;
+        var tail = Math.min(n, 20);
+        var ids = [];
+        for (var i = n - tail; i < n; i++) {
+            var m = messages[i];
+            ids.push(m.id != null ? m.id : (m.timestamp || ''));
+        }
+        var sig = n + '|' + ids.join(',');
+
+        if (_wcAggSig === sig && _wcAggCache) return _wcAggCache;
+
+        var partnerMsgs = [];
+        var myMsgs      = [];
+        for (var j = 0; j < n; j++) {
+            var msg = messages[j];
+            if (!msg.text || msg.type === 'system' || msg.type === 'call-event') continue;
+            if (msg.sender === 'user') myMsgs.push(msg); else partnerMsgs.push(msg);
+        }
+
+        var pFreq = {}, mFreq = {};
+        for (var a = 0; a < partnerMsgs.length; a++) {
+            pFreq = mergeFreq(pFreq, tokenize(partnerMsgs[a].text));
+        }
+        for (var b = 0; b < myMsgs.length; b++) {
+            mFreq = mergeFreq(mFreq, tokenize(myMsgs[b].text));
+        }
+        var aFreq = mergeFreq(pFreq, mFreq);
+
+        var WORD_LIMIT = 40; // 之前 60，减少 1/3 词数 → 大幅减轻绘制压力
+        _wcAggCache = {
+            partnerMsgs: partnerMsgs,
+            myMsgs:      myMsgs,
+            pTop:        topWords(pFreq, WORD_LIMIT),
+            mTop:        topWords(mFreq, WORD_LIMIT),
+            aTop:        topWords(aFreq, WORD_LIMIT)
+        };
+        _wcAggSig = sig;
+        return _wcAggCache;
+    }
+
+    // 暴露给其他模块（如收到新消息时）清除缓存
+    window._wcClearCache = function() {
+        _wcAggCache = null;
+        _wcAggSig = '';
+        _wcTextCache = Object.create(null);
+    };
 
     window.renderWordCloud = function() {
         var container = document.getElementById('wordcloud-container');
@@ -1619,38 +1716,31 @@ function initComboMenu() {
             return;
         }
 
+        var agg = computeAggCache();
+        if (!agg) {
+            container.innerHTML = '<div class="wc-empty"><i class="fas fa-ghost"></i><p>还没有可分析的文本</p></div>';
+            return;
+        }
+
         var pName = (typeof settings !== 'undefined' && settings.partnerName) ? settings.partnerName : '对方';
         var mName = (typeof settings !== 'undefined' && settings.myName)      ? settings.myName      : '我';
-
-        var partnerMsgs = messages.filter(function(m) { return m.sender !== 'user' && m.text && m.type !== 'system' && m.type !== 'call-event'; });
-        var myMsgs      = messages.filter(function(m) { return m.sender === 'user' && m.text && m.type !== 'system' && m.type !== 'call-event'; });
-
-        var pFreq = {}, mFreq = {};
-        partnerMsgs.forEach(function(m) { pFreq = mergeFreq(pFreq, tokenize(m.text)); });
-        myMsgs.forEach(function(m)      { mFreq = mergeFreq(mFreq, tokenize(m.text)); });
-        var aFreq = mergeFreq(pFreq, mFreq);
-
-        var pTop = topWords(pFreq, 60);
-        var mTop = topWords(mFreq, 60);
-        var aTop = topWords(aFreq, 60);
 
         var cur = container._currentView || 'all';
 
         function data(v) {
-            if (v === 'partner') return { words: pTop, total: partnerMsgs.length };
-            if (v === 'me')      return { words: mTop, total: myMsgs.length };
-            return { words: aTop, total: partnerMsgs.length + myMsgs.length };
+            if (v === 'partner') return { words: agg.pTop, total: agg.partnerMsgs.length };
+            if (v === 'me')      return { words: agg.mTop, total: agg.myMsgs.length };
+            return { words: agg.aTop, total: agg.partnerMsgs.length + agg.myMsgs.length };
         }
 
         function renderRank(words) {
             var el = container.querySelector('.wc-rank-list');
             if (!el) return;
             if (!words.length) { el.innerHTML = '<div class="wc-rank-empty">暂无数据</div>'; return; }
-            var cs     = getComputedStyle(document.documentElement);
-            var accent = cs.getPropertyValue('--accent-color').trim() || '#c5a47e';
-            var rgb    = hex3(accent);
-            var max    = words[0].count;
-            el.innerHTML = words.slice(0, 10).map(function(item, i) {
+            var rgb = getAccentRgb();
+            var max = words[0].count;
+            var top10 = words.length > 10 ? words.slice(0, 10) : words;
+            el.innerHTML = top10.map(function(item, i) {
                 var pct = Math.round(item.count / max * 100);
                 var numStyle = i < 3
                     ? 'color:rgb('+rgb[0]+','+rgb[1]+','+rgb[2]+');font-weight:700;'
@@ -1674,22 +1764,42 @@ function initComboMenu() {
                 + '<span class="wc-summary-pill"><i class="fas fa-font"></i> ' + d.words.length + ' 词</span>';
         }
 
-        function renderView(v) {
-            container._currentView = v;
-            container.querySelectorAll('.wc-view-btn').forEach(function(b) {
-                b.classList.toggle('active', b.dataset.view === v);
+        // canvas 绘制放到下一帧，避免阻塞 UI
+        var _pendingCanvasDraw = null;
+        function scheduleCanvasDraw(canvas, words) {
+            if (_pendingCanvasDraw) cancelAnimationFrame(_pendingCanvasDraw);
+            _pendingCanvasDraw = requestAnimationFrame(function() {
+                _pendingCanvasDraw = null;
+                drawWordCloud(canvas, words);
             });
+        }
+
+        function renderView(v, skipCanvas) {
+            container._currentView = v;
+            var tabs = container.querySelectorAll('.wc-view-btn');
+            for (var i = 0; i < tabs.length; i++) {
+                if (tabs[i].dataset.view === v) tabs[i].classList.add('active');
+                else tabs[i].classList.remove('active');
+            }
             var canvas = container.querySelector('#wc-canvas');
             if (!canvas) return;
             var d = data(v);
-            drawWordCloud(canvas, d.words);
             renderRank(d.words);
             renderSummary(d);
+            if (!skipCanvas) scheduleCanvasDraw(canvas, d.words);
         }
 
-        if (!container.querySelector('#wc-canvas')) {
+        var canvasCreated = !!container.querySelector('#wc-canvas');
+        if (!canvasCreated) {
             var dpr = window.devicePixelRatio || 1;
-            var cw  = Math.min(container.offsetWidth || (container.parentElement && container.parentElement.offsetWidth) || 340, 500);
+            // 确保容器已经显示（flex 生效），否则 offsetWidth 为 0
+            var parent = container.parentElement;
+            var availW = Math.min(
+                container.offsetWidth || (parent ? parent.offsetWidth - 12 : 0) || 340,
+                500
+            );
+            if (availW < 50) availW = 340;
+            var cw  = availW;
             var ch  = Math.round(cw * 0.72);
 
             container.innerHTML =
@@ -1720,11 +1830,14 @@ function initComboMenu() {
                 var shuffled = d.words.slice().sort(function(a, b) {
                     return a.count !== b.count ? b.count - a.count : Math.random() - 0.5;
                 });
-                drawWordCloud(canvas, shuffled);
+                scheduleCanvasDraw(canvas, shuffled);
             });
         }
 
-        renderView(cur);
+        // 先用同步方式把 DOM/列表/汇总渲染出来，canvas 放到下一帧
+        renderView(cur, true);
+        var canvas = container.querySelector('#wc-canvas');
+        if (canvas) scheduleCanvasDraw(canvas, data(cur).words);
     };
 
 })();
