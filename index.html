@@ -655,6 +655,29 @@
                 </div>
             </div>
 
+            <div class="settings-grid" style="grid-template-columns:1fr;">
+                <div class="settings-card" id="sync-settings" onclick="window.AppleHutSync.openPanel()" style="flex-direction:row;gap:18px;padding:18px 22px;align-items:center;justify-content:flex-start;">
+                    <i class="fas fa-mobile-screen-button" style="width:54px;height:54px;font-size:22px;margin-bottom:0;flex-shrink:0;"></i>
+                    <div style="display:flex;flex-direction:column;align-items:flex-start;gap:4px;flex:1;">
+                        <span style="font-size:15px;font-weight:600;color:var(--text-primary);">设备同步</span>
+                        <span class="settings-card-desc" id="sync-status-brief">把日记搬到另一台手机</span>
+                    </div>
+                    <i class="fas fa-chevron-right" style="font-size:14px;color:var(--text-secondary);margin-bottom:0;width:auto;height:auto;background:none;border-radius:0;"></i>
+                </div>
+                <div class="settings-card" id="push-settings" onclick="window.openPushPanel()" style="flex-direction:row;gap:18px;padding:18px 22px;align-items:center;justify-content:flex-start;">
+                    <i class="fas fa-bell" style="width:54px;height:54px;font-size:22px;margin-bottom:0;flex-shrink:0;"></i>
+                    <div style="display:flex;flex-direction:column;align-items:flex-start;gap:4px;flex:1;">
+                        <span style="font-size:15px;font-weight:600;color:var(--text-primary);">消息推送</span>
+                        <span class="settings-card-desc" id="push-status-brief">后台也能收到提醒</span>
+                    </div>
+                    <i class="fas fa-chevron-right" style="font-size:14px;color:var(--text-secondary);margin-bottom:0;width:auto;height:auto;background:none;border-radius:0;"></i>
+                </div>
+            </div>
+
+            <div class="settings-perm-hint">
+                <i class="fas fa-shield-halved"></i>
+                <span>权限管理 · 相机 / 麦克风 / 相册 / 通知</span>
+            </div>
 
             <div class="modal-buttons">
                 <button class="modal-btn modal-btn-secondary" id="cancel-settings">关闭</button>

@@ -274,6 +274,284 @@
         sync: syncConfig,
         refreshUI: refreshUI,
         consumeIntoChat: consumeIntoChat,
-        getInterval: getInterval
+        getInterval: getInterval,
+        syncConfig: syncConfig,
+        toggleEnabled: function (on) {
+            if (on === undefined) on = localStorage.getItem('notifEnabled') !== '1';
+            localStorage.setItem('notifEnabled', on ? '1' : '0');
+            var cb = document.getElementById('notif-permission-toggle');
+            if (cb) cb.checked = on;
+            syncConfig();
+            refreshUI();
+            refreshPushBrief();
+        }
     };
+
+    /* ---------- 设置面板里的副标题状态 ---------- */
+    function refreshPushBrief() {
+        var el = document.getElementById('push-status-brief');
+        if (!el) return;
+        var enabled = localStorage.getItem('notifEnabled') === '1';
+        var perm = hasPermission();
+        if (!enabled) el.textContent = '后台提醒已关闭';
+        else if (!perm) el.textContent = '通知权限未开启';
+        else {
+            var m = getInterval();
+            el.textContent = '每 ' + m + ' 分钟提醒一次 · 运行中';
+        }
+    }
+
+    /* ---------- 推送面板 UI ---------- */
+    var PUSH_INTERVALS = [
+        { v: 5,   l: '5分钟',  s: '更频繁' },
+        { v: 15,  l: '15分钟', s: '适中' },
+        { v: 30,  l: '30分钟', s: '推荐' },
+        { v: 60,  l: '60分钟', s: '更安静' }
+    ];
+    var PUSH_DURATIONS = [
+        { v: 6,   l: '6小时',   s: '短时段' },
+        { v: 24,  l: '24小时',  s: '一整天' },
+        { v: 168, l: '7天',     s: '一周' },
+        { v: 0,   l: '一直',    s: '不会自动停' }
+    ];
+
+    function getDuration() {
+        var v = parseInt(localStorage.getItem('AH_PUSH_DURATION'), 10);
+        if (isNaN(v)) v = 0;
+        return v;
+    }
+    function setDuration(hours) {
+        localStorage.setItem('AH_PUSH_DURATION', String(hours));
+    }
+
+    function ensurePushPanel() {
+        var modal = document.getElementById('ah-push-modal');
+        if (modal) return modal;
+        modal = document.createElement('div');
+        modal.className = 'modal';
+        modal.id = 'ah-push-modal';
+        modal.innerHTML =
+            '<div class="modal-content" style="max-width:460px;">' +
+              '<div class="modal-title">' +
+                '<i class="fas fa-bell"></i><span>消息推送</span>' +
+              '</div>' +
+              '<div id="ah-push-body" style="max-height:70vh;overflow-y:auto;padding-right:4px;"></div>' +
+              '<div class="modal-buttons">' +
+                '<button class="modal-btn modal-btn-secondary" id="ah-push-close">关闭</button>' +
+              '</div>' +
+            '</div>';
+        document.body.appendChild(modal);
+        modal.addEventListener('click', function (e) { if (e.target === modal) closePushPanel(); });
+        var closeBtn = modal.querySelector('#ah-push-close');
+        if (closeBtn) closeBtn.addEventListener('click', closePushPanel);
+        return modal;
+    }
+
+    function renderPushPanel() {
+        var body = document.getElementById('ah-push-body');
+        if (!body) return;
+        var enabled = localStorage.getItem('notifEnabled') === '1';
+        var perm = hasPermission();
+        var interval = getInterval();
+        var duration = getDuration();
+
+        // 状态条
+        var statusClass = 'push-panel-status-bar';
+        var statusIcon = '';
+        var statusTitle = '';
+        var statusDesc = '';
+        if (!enabled) {
+            statusClass += ' warn';
+            statusIcon = '<i class="fas fa-bell-slash"></i>';
+            statusTitle = '后台提醒已关闭';
+            statusDesc = '开启后，关掉 App 也会按间隔收到消息。';
+        } else if (!perm) {
+            statusClass += ' warn';
+            statusIcon = '<i class="fas fa-triangle-exclamation"></i>';
+            statusTitle = '通知权限未开启';
+            statusDesc = '系统没有允许 Apple Hut 发通知，请到手机设置里打开。';
+        } else {
+            statusClass += ' ok';
+            statusIcon = '<i class="fas fa-bell"></i>';
+            statusTitle = '通知权限正常';
+            var durLabel = duration === 0 ? '一直' : duration + ' 小时';
+            statusDesc = '退到后台后每 ' + interval + ' 分钟提醒一次，持续 ' + durLabel + '；锁屏、清理后台、重启手机都会继续。';
+        }
+
+        // 频率 chips
+        var intervalChips = PUSH_INTERVALS.map(function (it) {
+            var active = it.v === interval;
+            return '<button class="push-panel-chip' + (active ? ' active' : '') + '" data-int="' + it.v + '">' +
+                '<div class="chip-label">' + it.l + '</div>' +
+                (it.s ? '<div class="chip-sub">' + it.s + '</div>' : '') +
+                '</button>';
+        }).join('');
+
+        // 时长 chips
+        var durationChips = PUSH_DURATIONS.map(function (it) {
+            var active = it.v === duration;
+            return '<button class="push-panel-chip' + (active ? ' active' : '') + '" data-dur="' + it.v + '">' +
+                '<div class="chip-label">' + it.l + '</div>' +
+                (it.s ? '<div class="chip-sub">' + it.s + '</div>' : '') +
+                '</button>';
+        }).join('');
+
+        // 主按钮：开启/关闭开关（大 button）
+        var mainBtnHtml;
+        if (!enabled) {
+            mainBtnHtml = '<button class="push-panel-btn primary" id="ah-push-enable">' +
+                '<i class="fas fa-toggle-on"></i> 开启后台提醒</button>' +
+                '<button class="push-panel-btn secondary" id="ah-push-test">' +
+                '<i class="fas fa-paper-plane"></i> 发送测试通知</button>';
+        } else {
+            mainBtnHtml = '<button class="push-panel-btn primary" id="ah-push-test">' +
+                '<i class="fas fa-paper-plane"></i> 发送测试通知</button>' +
+                '<button class="push-panel-btn secondary" id="ah-push-optimize">' +
+                '<i class="fas fa-shield-halved"></i> 关闭电池优化</button>';
+        }
+
+        body.innerHTML =
+            '<div class="' + statusClass + '">' +
+              '<div class="pps-icon">' + statusIcon + '</div>' +
+              '<div class="pps-status-text">' +
+                '<div class="pps-title">' + statusTitle + '</div>' +
+                '<div class="pps-desc">' + statusDesc + '</div>' +
+              '</div>' +
+            '</div>' +
+
+            '<div class="push-panel-section">' +
+              '<div class="push-panel-section-title">提醒频率</div>' +
+              '<div class="push-panel-chip-row" id="ah-push-interval-row">' + intervalChips + '</div>' +
+            '</div>' +
+
+            '<div class="push-panel-section">' +
+              '<div class="push-panel-section-title">持续时长</div>' +
+              '<div class="push-panel-chip-row" id="ah-push-duration-row">' + durationChips + '</div>' +
+            '</div>' +
+
+            '<div class="push-panel-btn-row">' + mainBtnHtml + '</div>' +
+
+            (enabled ?
+                '<div class="push-panel-btn-row">' +
+                  '<button class="push-panel-btn danger" id="ah-push-disable">' +
+                    '<i class="fas fa-bell-slash"></i> 关闭后台提醒</button>' +
+                '</div>' : '') +
+
+            '<div class="push-panel-note">' +
+              '这是本机定时提醒，不需要联网。华为 / 荣耀手机建议在「应用启动管理」里允许自启动，并关闭电池优化。' +
+            '</div>';
+
+        // 绑定
+        bindPushPanelEvents();
+    }
+
+    function bindPushPanelEvents() {
+        var body = document.getElementById('ah-push-body');
+        if (!body) return;
+
+        // 频率选择
+        body.querySelectorAll('#ah-push-interval-row .push-panel-chip').forEach(function (btn) {
+            btn.addEventListener('click', function () {
+                var v = parseInt(btn.getAttribute('data-int'), 10);
+                localStorage.setItem('AH_PUSH_INTERVAL', String(v));
+                syncConfig();
+                refreshPushBrief();
+                renderPushPanel();
+                if (typeof showNotification === 'function') showNotification('推送频率已改为 ' + v + ' 分钟', 'success', 1800);
+            });
+        });
+
+        // 时长选择
+        body.querySelectorAll('#ah-push-duration-row .push-panel-chip').forEach(function (btn) {
+            btn.addEventListener('click', function () {
+                var v = parseInt(btn.getAttribute('data-dur'), 10);
+                setDuration(v);
+                renderPushPanel();
+                if (typeof showNotification === 'function') {
+                    var label = v === 0 ? '一直' : v + ' 小时';
+                    showNotification('持续时长已设为 ' + label, 'success', 1400);
+                }
+            });
+        });
+
+        // 开启
+        var enableBtn = body.querySelector('#ah-push-enable');
+        if (enableBtn) enableBtn.addEventListener('click', function () {
+            localStorage.setItem('notifEnabled', '1');
+            if (native) {
+                try { bridge.requestNotificationPermission(); } catch (e) {}
+                var tries = 0;
+                var timer = setInterval(function () {
+                    tries++;
+                    if (hasPermission()) {
+                        clearInterval(timer);
+                        syncConfig();
+                        refreshPushBrief();
+                        renderPushPanel();
+                        notify('Apple Hut 通知已开启 ✨', '后台推送已生效，关掉应用也会收到消息');
+                        if (typeof showNotification === 'function') showNotification('后台提醒已开启', 'success', 1800);
+                    } else if (tries > 40) {
+                        clearInterval(timer);
+                        localStorage.setItem('notifEnabled', '0');
+                        refreshPushBrief();
+                        renderPushPanel();
+                        if (typeof showNotification === 'function') showNotification('系统未允许通知权限', 'error', 2200);
+                    }
+                }, 300);
+            } else {
+                syncConfig();
+                refreshPushBrief();
+                renderPushPanel();
+                if (typeof showNotification === 'function') showNotification('后台提醒已开启（网页模式）', 'success', 1800);
+            }
+        });
+
+        // 发送测试通知
+        var testBtn = body.querySelector('#ah-push-test');
+        if (testBtn) testBtn.addEventListener('click', function () {
+            if (!native) {
+                if (typeof showNotification === 'function') showNotification('仅在 App 内可发送测试通知', 'warning');
+                return;
+            }
+            var sent = notify('Apple Hut 测试通知 ✨', '这是一条测试消息，确认后台推送已正常工作。');
+            if (typeof showNotification === 'function') {
+                showNotification(sent ? '测试通知已发送 ✓' : '发送失败，请检查通知权限', sent ? 'success' : 'error', 1800);
+            }
+        });
+
+        // 关闭电池优化
+        var optBtn = body.querySelector('#ah-push-optimize');
+        if (optBtn) optBtn.addEventListener('click', function () {
+            if (!native) return;
+            try { bridge.openAppSettings(); } catch (e) {}
+        });
+
+        // 关闭后台提醒
+        var disableBtn = body.querySelector('#ah-push-disable');
+        if (disableBtn) disableBtn.addEventListener('click', function () {
+            localStorage.setItem('notifEnabled', '0');
+            syncConfig();
+            refreshPushBrief();
+            renderPushPanel();
+            if (typeof showNotification === 'function') showNotification('后台提醒已关闭', 'info', 1600);
+        });
+    }
+
+    window.openPushPanel = function () {
+        var modal = ensurePushPanel();
+        modal.style.display = 'flex';
+        renderPushPanel();
+        refreshPushBrief();
+    };
+    window.closePushPanel = function () {
+        var modal = document.getElementById('ah-push-modal');
+        if (modal) modal.style.display = 'none';
+    };
+    window.refreshPushBrief = refreshPushBrief;
+
+    // 页面加载时更新设置面板里的副标题
+    document.addEventListener('DOMContentLoaded', function () {
+        refreshPushBrief();
+        setTimeout(refreshPushBrief, 1500);
+    });
 })();
