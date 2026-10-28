@@ -117,6 +117,8 @@
         if (checkbox && checkbox.checked) {
             try { bridge.requestNotificationPermission(); } catch (e) {}
             localStorage.setItem('notifEnabled', '1');
+            // 同时管理持续时长计时
+            (getDuration() > 0 ? markPushStarted() : clearPushStarted());
             var tries = 0;
             var timer = setInterval(function () {
                 tries++;
@@ -126,20 +128,25 @@
                     notify('Apple Hut 通知已开启 ✨', '后台推送已生效，关掉应用也会收到消息');
                     syncConfig();
                     refreshUI();
+                    refreshPushBrief();
                 } else if (tries > 60) {
                     clearInterval(timer);
                     if (statusEl) statusEl.textContent = '❌ 系统未允许通知，请到手机设置里打开';
                     if (checkbox) checkbox.checked = false;
                     localStorage.setItem('notifEnabled', '0');
+                    clearPushStarted();
                     syncConfig();
                     refreshUI();
+                    refreshPushBrief();
                 }
             }, 300);
         } else {
             localStorage.setItem('notifEnabled', '0');
+            clearPushStarted();
             if (statusEl) statusEl.textContent = '已关闭 — 后台将不再推送';
             syncConfig();
             refreshUI();
+            refreshPushBrief();
         }
     };
 
@@ -245,8 +252,38 @@
         return added;
     }
 
+    /* ---------- 持续时长：到时自动关闭 ---------- */
+    var DURATION_START_KEY = 'AH_PUSH_STARTED_AT';
+
+    function markPushStarted() {
+        localStorage.setItem(DURATION_START_KEY, String(Date.now()));
+    }
+    function clearPushStarted() {
+        try { localStorage.removeItem(DURATION_START_KEY); } catch (e) {}
+    }
+    function checkDurationExpiry() {
+        if (localStorage.getItem('notifEnabled') !== '1') return;
+        var dur = getDuration();
+        if (dur <= 0) return; // 0 = 一直
+        var started = parseInt(localStorage.getItem(DURATION_START_KEY) || '0', 10);
+        if (!started) { markPushStarted(); return; }
+        var elapsed = Date.now() - started;
+        var msCap = dur * 3600 * 1000;
+        if (elapsed >= msCap) {
+            localStorage.setItem('notifEnabled', '0');
+            clearPushStarted();
+            syncConfig();
+            refreshUI();
+            refreshPushBrief();
+            if (typeof showNotification === 'function') {
+                showNotification('已到达持续时长，后台提醒自动关闭', 'info', 2800);
+            }
+        }
+    }
+
     /* ---------- 页面状态同步 ---------- */
     function bootSync() {
+        checkDurationExpiry();
         syncConfig();
         refreshUI();
     }
@@ -260,12 +297,15 @@
 
     document.addEventListener('visibilitychange', function () {
         if (document.visibilityState === 'hidden') syncConfig();
-        else { refreshUI(); }
+        else { bootSync(); }
     });
 
     setInterval(function () {
-        if (document.visibilityState === 'visible') syncConfig();
-    }, 600000);
+        if (document.visibilityState === 'visible') {
+            checkDurationExpiry();
+            syncConfig();
+        }
+    }, 60000); // 每分钟巡检（之前是 600s 太长）
 
     window.AHNativePush = {
         available: native,
@@ -465,11 +505,20 @@
         body.querySelectorAll('#ah-push-duration-row .push-panel-chip').forEach(function (btn) {
             btn.addEventListener('click', function () {
                 var v = parseInt(btn.getAttribute('data-dur'), 10);
+                var was = getDuration();
                 setDuration(v);
+                // 推送已开时：切换 duration 会重置计时（给用户"重新开始计时"的直观感受）
+                if (localStorage.getItem('notifEnabled') === '1') {
+                    if (v > 0) markPushStarted();
+                    else clearPushStarted();
+                } else {
+                    // 推送没开时：duration 改 0 也清掉残留的 started
+                    if (v === 0) clearPushStarted();
+                }
                 renderPushPanel();
                 if (typeof showNotification === 'function') {
                     var label = v === 0 ? '一直' : v + ' 小时';
-                    showNotification('持续时长已设为 ' + label, 'success', 1400);
+                    showNotification('持续时长已设为 ' + label + (v > 0 && localStorage.getItem('notifEnabled') === '1' ? '，计时已重置' : ''), 'success', 1400);
                 }
             });
         });
@@ -478,6 +527,8 @@
         var enableBtn = body.querySelector('#ah-push-enable');
         if (enableBtn) enableBtn.addEventListener('click', function () {
             localStorage.setItem('notifEnabled', '1');
+            var dur = getDuration();
+            if (dur > 0) markPushStarted(); else clearPushStarted();
             if (native) {
                 try { bridge.requestNotificationPermission(); } catch (e) {}
                 var tries = 0;
@@ -493,6 +544,7 @@
                     } else if (tries > 40) {
                         clearInterval(timer);
                         localStorage.setItem('notifEnabled', '0');
+                        clearPushStarted();
                         refreshPushBrief();
                         renderPushPanel();
                         if (typeof showNotification === 'function') showNotification('系统未允许通知权限', 'error', 2200);
@@ -530,6 +582,7 @@
         var disableBtn = body.querySelector('#ah-push-disable');
         if (disableBtn) disableBtn.addEventListener('click', function () {
             localStorage.setItem('notifEnabled', '0');
+            clearPushStarted();
             syncConfig();
             refreshPushBrief();
             renderPushPanel();

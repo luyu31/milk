@@ -942,7 +942,22 @@
             var el = document.getElementById('ah-sync-status-text');
             if (el) el.textContent = statusText();
         } catch (e) {}
+        // 设置面板里卡片的副标题
+        try {
+            var brief = document.getElementById('sync-status-brief');
+            if (brief) brief.textContent = statusBrief();
+        } catch (e2) {}
         refreshPanelStatus();
+    }
+
+    function statusBrief() {
+        if (!hasConfig()) return '未连接服务器，点击设置';
+        if (!session) return '已配置服务器，登录后开始同步';
+        var email = (session.user && session.user.email) ? session.user.email : '已登录账号';
+        var tail = meta.lastSync ? timeAgo(meta.lastSync) : '等待首次同步';
+        var dirty = Object.keys(meta.dirty || {}).length;
+        if (dirty > 0) tail += ' · 待同步 ' + dirty;
+        return email + ' · ' + tail;
     }
 
     /* ---------- 界面 ---------- */
@@ -1331,6 +1346,13 @@
             ensureTimers();
         });
     }
+
+    // 兜底：确保设置面板里的副标题一定会被 JS 覆盖掉 HTML 原始占位文本
+    document.addEventListener('DOMContentLoaded', function () {
+        setTimeout(updateStatus, 50);
+        setTimeout(updateStatus, 800);
+        setTimeout(updateStatus, 2500);
+    });
 
     window.AppleHutSync = {
         openPanel: openPanel,
