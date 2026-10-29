@@ -753,6 +753,30 @@
                 </div>
             </div>
         </div>
+
+        <div class="settings-section" id="summer-daylight-section">
+            <div class="settings-section-title"><i class="fas fa-leaf"></i>叠加主题</div>
+            <div style="font-size:11px;color:var(--text-secondary);opacity:0.7;margin-bottom:8px;">开启后叠加在当前主题之上，关闭后完全恢复原样</div>
+
+            <div id="summer-daylight-card" class="summer-daylight-card" role="button" tabindex="0" aria-label="夏日白昼叠加主题">
+                <!-- 小预览卡：3 个圆点 -->
+                <div class="summer-preview">
+                    <span class="summer-preview-dot summer-dot-green" aria-hidden="true"></span>
+                    <span class="summer-preview-dot summer-dot-yellow" aria-hidden="true"></span>
+                    <span class="summer-preview-dot summer-dot-white" aria-hidden="true"></span>
+                </div>
+                <div class="summer-preview-divider" aria-hidden="true"></div>
+                <div class="summer-info">
+                    <div class="summer-info-title">夏日白昼 <span style="font-size:10px;font-weight:500;opacity:0.7;">SummerDaylight</span></div>
+                    <div class="summer-info-desc">青苹果绿 · 暖黄点缀 · 清新白底</div>
+                </div>
+                <label class="notif-toggle-switch" style="position:relative;display:inline-block;width:44px;height:24px;flex-shrink:0;">
+                    <input type="checkbox" id="summer-daylight-toggle" style="opacity:0;width:0;height:0;">
+                    <span class="notif-toggle-slider"></span>
+                </label>
+            </div>
+        </div>
+
         <div class="settings-section" id="theme-schemes-section">
             <div class="settings-section-title">
                 <i class="fas fa-layer-group"></i>主题方案
@@ -2250,6 +2274,7 @@
 <div id="dg-editor-modal" style="display:none;"></div>
     <!-- == 核心层 == -->
     <script src="js/config.js"></script>
+    <script src="js/sync-data-prepare.js"></script>
     <script src="js/sync-engine.js"></script>
     <script src="js/utils.js"></script>
     <script src="js/backup-engine.js"></script>
