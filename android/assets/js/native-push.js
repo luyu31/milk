@@ -237,6 +237,12 @@
     /* ---------- notify 增强：带 payload 写入 localStorage ---------- */
     function notify(title, body, opt) {
         opt = opt || {};
+        // 兜底：没传 sessionId 但全局 SESSION_ID 有值 → 自动用
+        var sid = opt.sessionId;
+        var mid = opt.messageId;
+        if (!sid) {
+            try { sid = (typeof SESSION_ID !== 'undefined') ? SESSION_ID : null; } catch (e) { sid = null; }
+        }
         // 先发通知
         var ok = false;
         try {
@@ -245,12 +251,12 @@
                 ok = true;
             }
         } catch (e) { ok = false; }
-        // 无论原生通知有没有发成功，只要有 payload 就写标记
+        // 无论原生通知有没有发成功，只要有 sessionId 就写标记
         // （万一 Web Notification 走 fallback，也能支持跳转）
-        if (opt && opt.sessionId) {
+        if (sid) {
             writePendingClick({
-                sessionId: opt.sessionId,
-                messageId: opt.messageId || null
+                sessionId: sid,
+                messageId: mid || null
             });
         }
         return ok;
