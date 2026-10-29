@@ -47,7 +47,8 @@
             consecutiveFails: 0,
             dirty: false,
             restoreInProgress: false,
-            lastError: null
+            lastError: null,
+            connectedAt: 0
         };
     }
 
@@ -441,10 +442,35 @@
         // 配置（UI 调用）
         setConfig: function (cfg) {
             localStorage.setItem(CONFIG_KEY, JSON.stringify(cfg));
+            // 配置变了 → 清掉 connectedAt（UI 会重新测）
+            var m = loadMeta();
+            m.connectedAt = 0;
+            saveMeta(m);
         },
         getConfig: function () { return loadConfig(); },
         clearConfig: function () {
             localStorage.removeItem(CONFIG_KEY);
+            var m = loadMeta();
+            m.connectedAt = 0;
+            saveMeta(m);
+        },
+
+        // 测试连接（UI 调用）
+        testConnection: async function (cfg) {
+            try {
+                var result = await OSSV4.ossTestConnection(cfg || loadConfig());
+                var m = loadMeta();
+                m.connectedAt = Date.now();
+                saveMeta(m);
+                return { ok: true };
+            } catch (err) {
+                return {
+                    ok: false,
+                    code: err.code || (err.isOssError ? 'OssError' : 'NetworkError'),
+                    hint: err.hint || err.message || String(err),
+                    isOssError: !!err.isOssError
+                };
+            }
         },
 
         // Push API

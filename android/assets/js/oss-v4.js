@@ -338,9 +338,98 @@
         });
         if (!resp.ok) {
             var errText = await resp.text().catch(function () { return ''; });
-            throw new Error('OSS DELETE ' + path + ' 失败 HTTP ' + resp.status + ': ' + errText.slice(0, 200));
+            throw parseOssHttpError(resp.status, errText, 'DELETE ' + path);
         }
         return resp;
+    }
+
+    // =========================================================================
+    // 测试连接 + 错误解析（给 UI 用）
+    // =========================================================================
+
+    /**
+     * GET Bucket 列表对象（max-keys=1）——阿里云 OSS REST API 规定
+     * 返回最多 1 条对象；成功即 AK/SK/Bucket/Region/CORS 全部正确。
+     */
+    async function ossTestConnection(config) {
+        config = config || loadConfig();
+        var opts = await signCanonicalRequest({
+            method: 'GET',
+            path: '/',
+            body: '',
+            // ListBucket 的 query 字符串不参与签名（阿里云 OSS V4 简化规则）
+            headers: {}
+        }, config);
+
+        var url = buildOssUrl(config, '/') + '?max-keys=1';
+        var resp = await fetch(url, {
+            method: 'GET',
+            headers: opts.headers,
+            mode: 'cors'
+        });
+        if (!resp.ok) {
+            var errText = await resp.text().catch(function () { return ''; });
+            throw parseOssHttpError(resp.status, errText, 'Test connection GET /');
+        }
+        return { ok: true };
+    }
+
+    /**
+     * 解析阿里云 OSS 错误 XML 响应 → 结构化 {code, message, hint}
+     * UI 层直接显示 hint，用户看得懂。
+     */
+    function parseOssHttpError(status, body, ctx) {
+        // 先抓 XML 里的 <Code>...</Code>
+        var code = null, message = null;
+        if (body && body.indexOf('<Error') !== -1) {
+            var cm = /<Code>([^<]+)<\/Code>/.exec(body);
+            var mm = /<Message>([^<]+)<\/Message>/.exec(body);
+            if (cm) code = cm[1];
+            if (mm) message = mm[1];
+        }
+
+        // 网络层错误（CORS / DNS / 连接超时）
+        if (status === 0) {
+            return makeFriendlyError('NetworkError', '请求被浏览器拦截（可能是 CORS 跨域未配置）',
+                '必须在阿里云 OSS Bucket 控制台配置 CORS：来源填 `*`，Methods 勾选 `PUT,GET,DELETE,HEAD`，Allow-Headers 包含 `Authorization,Content-Type,x-oss-date,x-oss-content-sha256`');
+        }
+
+        // 根据 Code 映射友好提示
+        var hintMap = {
+            'InvalidAccessKeyId': 'AccessKey ID 不存在，请检查拼写或是否已删除',
+            'InvalidSignature': '签名校验失败，请确认 SecretAccessKey 正确',
+            'SignatureDoesNotMatch': '签名不匹配。常见原因：① SecretAccessKey 填错；② 手机系统时间与 UTC 偏差超过 15 分钟（请自动校准时间）',
+            'NoSuchBucket': 'Bucket 不存在，或 Bucket 名与地区不匹配（请确认 Bucket 所在 Region 和上面选的一致）',
+            'AccessDenied': 'RAM 权限不足。请给该子账号授予目标 Bucket 的 GetObject/PutObject/DeleteObject/ListObjects 权限',
+            'BucketAlreadyExists': 'Bucket 已存在但所有者不同（阿里云全局唯一）',
+            'AccessKeyForbidden': 'AccessKey 已被禁用',
+            'RequestTimeTooSkewed': '手机时间偏差超过 15 分钟，请开启自动校准时间',
+            'MalformedXML': 'OSS 返回格式异常，通常是 Bucket 或 Region 配置不对'
+        };
+
+        if (code && hintMap[code]) {
+            return makeFriendlyError(code, message || hintMap[code], hintMap[code]);
+        }
+        if (code) {
+            return makeFriendlyError(code, message || 'OSS 返回错误', '错误码 ' + code + '，请对照阿里云文档排查');
+        }
+        // 无 XML Code，用 HTTP status 兜底
+        switch (status) {
+            case 401: return makeFriendlyError('401', '认证失败', 'AccessKey 或 Secret 不正确');
+            case 403: return makeFriendlyError('403', '权限被拒', 'RAM 权限不足或 Bucket ACL 限制');
+            case 404: return makeFriendlyError('404', 'Bucket 不存在', '请确认 Bucket 名和 Region 都正确');
+            case 405: return makeFriendlyError('405', '方法不允许', '可能是 CORS 未配置该 HTTP 方法');
+            default: return makeFriendlyError('HTTP_' + status, '请求失败', ctx + ' → HTTP ' + status + '，原始响应：' + (body || '').slice(0, 200));
+        }
+    }
+
+    function makeFriendlyError(code, message, hint) {
+        var err = new Error(hint || message || code);
+        err.code = code;
+        err.message = message;
+        err.hint = hint || message;
+        err.isOssError = true;
+        return err;
     }
 
     // =========================================================================
@@ -348,7 +437,7 @@
     // =========================================================================
 
     global.OSSV4 = {
-        version: 1,
+        version: 2,
         // 签名核心（暴露，便于测试）
         signCanonicalRequest: signCanonicalRequest,
         deriveSigningKey: deriveSigningKey,
@@ -358,6 +447,9 @@
         ossPut: ossPut,
         ossGet: ossGet,
         ossDelete: ossDelete,
+        ossTestConnection: ossTestConnection,
+        // 错误
+        parseOssHttpError: parseOssHttpError,
         // 工具
         loadConfig: loadConfig,
         buildOssUrl: buildOssUrl,
