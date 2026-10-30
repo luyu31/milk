@@ -50,6 +50,13 @@ public class MainActivity extends Activity {
     private String pendingMime = "application/octet-stream";
     private String pendingBase64 = "";
 
+    /** 页面 JS 是否已就绪（onPageFinished 置 true） */
+    private volatile boolean jsReady = false;
+
+    /** 冷启动时先攒着，等 JS 就绪再投递 */
+    private String pendingTapSession = null;
+    private String pendingTapMessage = null;
+
     private static final Map<String, String> MIME = new HashMap<>();
 
     static {
@@ -83,7 +90,7 @@ public class MainActivity extends Activity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        PushHelper.ensureChannel(this);
+        NotificationChannels.ensureAll(this);
 
         Window window = getWindow();
         window.setStatusBarColor(0xFFF8F2E9);
@@ -151,6 +158,14 @@ public class MainActivity extends Activity {
                 }
                 return true;
             }
+
+            @Override
+            public void onPageFinished(WebView view, String url) {
+                super.onPageFinished(view, url);
+                jsReady = true;
+                // 冷启动：JS 就绪后把攒着的通知点击事件投递下去
+                flushPendingTap();
+            }
         });
 
         webView.setWebChromeClient(new WebChromeClient() {
@@ -178,6 +193,77 @@ public class MainActivity extends Activity {
         });
 
         webView.loadUrl(START_URL);
+
+        // 冷启动：Activity 由通知点击拉起时，先把 extras 攒起来
+        handleTapIntent(getIntent());
+    }
+
+    /* ==================== 通知点击精准跳转 ==================== */
+
+    /**
+     * 解析 Intent 里的 sessionId / messageId。
+     * JS 未就绪时先存字段，等 onPageFinished 再投递。
+     */
+    private void handleTapIntent(Intent intent) {
+        if (intent == null) return;
+        try {
+            String sid = intent.getStringExtra(PushHelper.EXTRA_SESSION_ID);
+            String mid = intent.getStringExtra(PushHelper.EXTRA_MESSAGE_ID);
+            boolean fromPush = intent.getBooleanExtra(PushHelper.EXTRA_FROM_PUSH, false);
+            if (sid == null && !fromPush) return;
+            pendingTapSession = sid;
+            pendingTapMessage = mid;
+            // 消费掉，避免旋转/重建时重复跳转
+            intent.removeExtra(PushHelper.EXTRA_SESSION_ID);
+            intent.removeExtra(PushHelper.EXTRA_MESSAGE_ID);
+            flushPendingTap();
+        } catch (Throwable ignored) {
+        }
+    }
+
+    /**
+     * 把攒着的点击事件投递给 WebView。
+     * 优先用精准 payload；没有 sessionId 时退化为让 JS 读 localStorage 标记。
+     */
+    private void flushPendingTap() {
+        if (!jsReady || webView == null) return;
+        final String sid = pendingTapSession;
+        final String mid = pendingTapMessage;
+        if (sid == null && mid == null) return;
+        pendingTapSession = null;
+        pendingTapMessage = null;
+
+        final String js;
+        if (sid != null) {
+            js = "(function(){try{var s=" + JSONObject.quote(sid)
+                    + ";var m=" + (mid == null ? "null" : JSONObject.quote(mid))
+                    + ";"
+                    + "if(window.handleNotificationClick){window.handleNotificationClick(s,m);}"
+                    + "else if(window.AHNativePushConsumeClick){window.AHNativePushConsumeClick();}"
+                    + "}catch(e){}})();";
+        } else {
+            js = "(function(){try{"
+                    + "if(window.handleNotificationClickFromStorage)"
+                    + "window.handleNotificationClickFromStorage();"
+                    + "}catch(e){}})();";
+        }
+        runOnUiThread(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    if (webView != null) webView.evaluateJavascript(js, null);
+                } catch (Throwable ignored) {
+                }
+            }
+        });
+    }
+
+    /** singleTask 模式下，从通知再次进入会走这里（而不是 onCreate） */
+    @Override
+    protected void onNewIntent(Intent intent) {
+        super.onNewIntent(intent);
+        setIntent(intent);
+        handleTapIntent(intent);
     }
 
     private WebResourceResponse serveAsset(String rawPath) {
@@ -246,7 +332,40 @@ public class MainActivity extends Activity {
 
         @JavascriptInterface
         public void notify(String title, String body) {
-            PushHelper.post(MainActivity.this, title, body);
+            PushHelper.post(MainActivity.this, title, body,
+                    PushStore.getSessionId(MainActivity.this), null);
+        }
+
+        /** 带 payload 的通知：点击后能精准跳到 sessionId 对应会话的 messageId 消息 */
+        @JavascriptInterface
+        public void notifyWithPayload(String title, String body, String sessionId, String messageId) {
+            PushHelper.post(MainActivity.this, title, body, sessionId, messageId);
+        }
+
+        /** 前端同步通话状态：通话中不启后台保活 */
+        @JavascriptInterface
+        public void setInCall(boolean inCall) {
+            KeepAliveService.inCall = inCall;
+            if (inCall) {
+                KeepAliveService.stop(MainActivity.this);
+            } else if (!isForeground) {
+                KeepAliveService.start(MainActivity.this);
+            }
+        }
+
+        @JavascriptInterface
+        public void startKeepAlive() {
+            if (!isForeground) KeepAliveService.start(MainActivity.this);
+        }
+
+        @JavascriptInterface
+        public void stopKeepAlive() {
+            KeepAliveService.stop(MainActivity.this);
+        }
+
+        @JavascriptInterface
+        public boolean isKeepAliveRunning() {
+            return KeepAliveService.isRunning();
         }
 
         @JavascriptInterface
@@ -379,6 +498,8 @@ public class MainActivity extends Activity {
         if (webView != null) {
             webView.onPause();
         }
+        // 退到后台：拉起常驻保活服务（通话中会自动跳过）
+        KeepAliveService.start(this);
         super.onPause();
     }
 
@@ -386,12 +507,16 @@ public class MainActivity extends Activity {
     protected void onResume() {
         super.onResume();
         isForeground = true;
+        // 回到前台：停掉常驻保活服务，通知自动消失
+        KeepAliveService.stop(this);
         if (webView != null) {
             webView.onResume();
             webView.evaluateJavascript(
                     "window.AHNativePush&&AHNativePush.consumeIntoChat&&AHNativePush.consumeIntoChat();",
                     null);
         }
+        // 热启动：回到前台时把之前攒的通知点击事件补投递
+        flushPendingTap();
     }
 
     @Override

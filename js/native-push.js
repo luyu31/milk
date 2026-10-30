@@ -247,7 +247,13 @@
         var ok = false;
         try {
             if (native && hasPermission()) {
-                bridge.notify(title || 'Apple Hut', body || '对方发来了消息');
+                if (typeof bridge.notifyWithPayload === 'function' && sid) {
+                    // 原生通知携带 sessionId/messageId，点击后原生层可直接精准跳转
+                    bridge.notifyWithPayload(title || 'Apple Hut',
+                            body || '对方发来了消息', sid, mid || '');
+                } else {
+                    bridge.notify(title || 'Apple Hut', body || '对方发来了消息');
+                }
                 ok = true;
             }
         } catch (e) { ok = false; }
@@ -388,7 +394,8 @@
             var sid = String(item.sessionId || SESSION_ID);
             var ts = parseInt(item.ts, 10) || Date.now();
             var msg = {
-                id: String(ts) + '_push_' + i + '_' + Math.random().toString(36).slice(2, 6),
+                // 原生通知带的 messageId 优先，保证「点通知」能精确定位到这条
+                id: String(item.messageId || (String(ts) + '_push_' + i + '_' + Math.random().toString(36).slice(2, 6))),
                 sender: item.sender || partnerName,
                 text: text,
                 timestamp: new Date(ts),
@@ -458,6 +465,26 @@
         refreshUI();
     }
 
+    /* ---------- 后台常驻保活（原生 Foreground Service）---------- */
+    function startKeepAlive() {
+        try {
+            if (native && typeof bridge.startKeepAlive === 'function') bridge.startKeepAlive();
+        } catch (e) {}
+    }
+
+    function stopKeepAlive() {
+        try {
+            if (native && typeof bridge.stopKeepAlive === 'function') bridge.stopKeepAlive();
+        } catch (e) {}
+    }
+
+    function isKeepAliveRunning() {
+        try {
+            if (native && typeof bridge.isKeepAliveRunning === 'function') return !!bridge.isKeepAliveRunning();
+        } catch (e) {}
+        return false;
+    }
+
     document.addEventListener('DOMContentLoaded', function () {
         bootSync();
         setTimeout(bootSync, 1500);
@@ -468,9 +495,12 @@
     window.addEventListener('load', bootSync);
 
     document.addEventListener('visibilitychange', function () {
-        if (document.visibilityState === 'hidden') syncConfig();
-        else {
+        if (document.visibilityState === 'hidden') {
+            syncConfig();
+            startKeepAlive();
+        } else {
             bootSync();
+            stopKeepAlive();
             // 热启动：用户可能刚点了通知切回来
             try { consumePendingNotificationClick(); } catch (e) {}
         }
@@ -495,6 +525,9 @@
         readPendingClick: readPendingClick,
         clearPendingClick: clearPendingClick,
         navigateToMessage: doNavigateToMessage,
+        startKeepAlive: startKeepAlive,
+        stopKeepAlive: stopKeepAlive,
+        isKeepAliveRunning: isKeepAliveRunning,
         getInterval: getInterval,
         syncConfig: syncConfig,
         toggleEnabled: function (on) {

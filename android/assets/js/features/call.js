@@ -610,6 +610,8 @@ html:not([data-theme="dark"])[data-color-theme="black-white"] .message-sent{
         S.minimized = false; S.isPartnerCall = !!isPartner; S.immersive = false;
         S.startedAt = Date.now();
         S.endReason = null;
+        // 通知原生层：通话开始，暂停后台常驻保活（避免两条常驻通知打架）
+        try { if (window.AppleHut && window.AppleHut.setInCall) window.AppleHut.setInCall(true); } catch (e) {}
         document.getElementById('call-window')?.classList.remove('immersive');
 
         ['call-inc-avatar','call-conn-avatar','call-win-avatar','call-mini-av'].forEach(fillAv);
@@ -685,6 +687,8 @@ html:not([data-theme="dark"])[data-color-theme="black-white"] .message-sent{
         const hasConnected = S.startTime !== null;
 
         S.active = false; S.startTime = null;
+        // 通知原生层：通话结束，恢复后台常驻保活
+        try { if (window.AppleHut && window.AppleHut.setInCall) window.AppleHut.setInCall(false); } catch (e) {}
         cancelAnimationFrame(S.timerRAF);
         clearTimeout(S.connectingTimer); clearTimeout(S.incomingTimer);
 
