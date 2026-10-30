@@ -68,21 +68,36 @@ public class KeepAliveService extends Service {
 
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
-        NotificationChannels.ensureAll(this);
-        if (inCall) {
-            // 通话中：不进前台，直接退出
+        // 关键：Android 12+ 规定 startForegroundService 后必须尽快调用 startForeground，
+        // 超时（5s）会抛 ForegroundServiceDidNotStartInTimeException，直接把整个进程杀掉。
+        // 所以这里改成「先无条件挂通知，再判断通话状态」，绝不允许路径绕过 startForeground。
+        Notification n = null;
+        try {
+            NotificationChannels.ensureAll(this);
+            n = buildNotification();
+        } catch (Throwable ignored) {
+        }
+        if (n == null) {
             stopSelf();
             return START_NOT_STICKY;
         }
         try {
-            Notification n = buildNotification();
             if (Build.VERSION.SDK_INT >= 34) {
                 startForeground(NOTIF_ID, n, ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC);
             } else {
                 startForeground(NOTIF_ID, n);
             }
         } catch (Throwable t) {
-            // 前台服务启动失败（权限/系统限制），静默退出
+            // API 34 类型不被允许等情况：退回不带 type 的老写法
+            try {
+                startForeground(NOTIF_ID, n);
+            } catch (Throwable ignored) {
+            }
+            stopSelf();
+            return START_NOT_STICKY;
+        }
+        if (inCall) {
+            // 通话中：保活通知已挂上，随即退出，避免和通话保活通知重复
             stopSelf();
             return START_NOT_STICKY;
         }
@@ -94,9 +109,12 @@ public class KeepAliveService extends Service {
         open.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK
                 | Intent.FLAG_ACTIVITY_CLEAR_TOP
                 | Intent.FLAG_ACTIVITY_SINGLE_TOP);
-        int piFlags = PendingIntent.FLAG_UPDATE_CURRENT;
-        if (Build.VERSION.SDK_INT >= 23) piFlags |= PendingIntent.FLAG_IMMUTABLE;
-        PendingIntent pi = PendingIntent.getActivity(this, 0, open, piFlags);
+        int piFlags = PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE;
+        PendingIntent pi = null;
+        try {
+            pi = PendingIntent.getActivity(this, 0, open, piFlags);
+        } catch (Throwable ignored) {
+        }
 
         Notification.Builder b;
         if (Build.VERSION.SDK_INT >= 26) {
@@ -111,8 +129,10 @@ public class KeepAliveService extends Service {
                 .setAutoCancel(false)
                 .setShowWhen(false)
                 .setPriority(Notification.PRIORITY_LOW)
-                .setCategory(Notification.CATEGORY_SERVICE)
-                .setContentIntent(pi);
+                .setCategory(Notification.CATEGORY_SERVICE);
+        if (pi != null) {
+            b.setContentIntent(pi);
+        }
         if (Build.VERSION.SDK_INT >= 21) {
             b.setVisibility(Notification.VISIBILITY_SECRET);
         }

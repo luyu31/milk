@@ -333,11 +333,16 @@ public class MainActivity extends Activity {
         @JavascriptInterface
         public void requestNotificationPermission() {
             if (Build.VERSION.SDK_INT < 33) return;
-            if (PushHelper.canNotify(MainActivity.this)) return;
+            try {
+                if (PushHelper.canNotify(MainActivity.this)) return;
+            } catch (Throwable ignored) {
+                return;
+            }
             runOnUiThread(new Runnable() {
                 @Override
                 public void run() {
                     try {
+                        if (isFinishing() || isDestroyed()) return;
                         requestPermissions(new String[]{Manifest.permission.POST_NOTIFICATIONS}, REQ_NOTIFICATIONS);
                     } catch (Throwable ignored) {
                     }
@@ -354,39 +359,58 @@ public class MainActivity extends Activity {
         /** 带 payload 的通知：点击后能精准跳到 sessionId 对应会话的 messageId 消息 */
         @JavascriptInterface
         public void notifyWithPayload(String title, String body, String sessionId, String messageId) {
-            PushHelper.post(MainActivity.this, title, body, sessionId, messageId);
+            try {
+                PushHelper.post(MainActivity.this, title, body, sessionId, messageId);
+            } catch (Throwable ignored) {
+            }
         }
 
         /** 前端同步通话状态：通话中不启后台保活 */
         @JavascriptInterface
         public void setInCall(boolean inCall) {
-            MainActivity.this.inCall = inCall;
-            KeepAliveService.inCall = inCall;   // 服务内部再存一份兜底
-            if (inCall) {
-                KeepAliveService.stop(MainActivity.this);
-            } else if (!isForeground) {
-                KeepAliveService.start(MainActivity.this);
+            try {
+                MainActivity.this.inCall = inCall;
+                KeepAliveService.inCall = inCall;   // 服务内部再存一份兜底
+                if (inCall) {
+                    KeepAliveService.stop(MainActivity.this);
+                } else if (!isForeground) {
+                    KeepAliveService.start(MainActivity.this);
+                }
+            } catch (Throwable ignored) {
             }
         }
 
         @JavascriptInterface
         public void startKeepAlive() {
-            if (!isForeground) KeepAliveService.start(MainActivity.this);
+            try {
+                if (!isForeground) KeepAliveService.start(MainActivity.this);
+            } catch (Throwable ignored) {
+            }
         }
 
         @JavascriptInterface
         public void stopKeepAlive() {
-            KeepAliveService.stop(MainActivity.this);
+            try {
+                KeepAliveService.stop(MainActivity.this);
+            } catch (Throwable ignored) {
+            }
         }
 
         @JavascriptInterface
         public boolean isKeepAliveRunning() {
-            return KeepAliveService.isRunning();
+            try {
+                return KeepAliveService.isRunning();
+            } catch (Throwable t) {
+                return false;
+            }
         }
 
         @JavascriptInterface
         public void setPushConfig(String json) {
-            PushStore.saveConfig(MainActivity.this, json);
+            try {
+                PushStore.saveConfig(MainActivity.this, json);
+            } catch (Throwable ignored) {
+            }
         }
 
         @JavascriptInterface
@@ -511,12 +535,18 @@ public class MainActivity extends Activity {
     @Override
     protected void onPause() {
         isForeground = false;
-        if (webView != null) {
-            webView.onPause();
+        try {
+            if (webView != null) {
+                webView.onPause();
+            }
+        } catch (Throwable ignored) {
         }
         // 退到后台：拉起常驻保活服务（通话中 / 正在销毁时不启）
-        if (!inCall && !isFinishing()) {
-            KeepAliveService.start(this);
+        try {
+            if (!inCall && !isFinishing()) {
+                KeepAliveService.start(this);
+            }
+        } catch (Throwable ignored) {
         }
         super.onPause();
     }
@@ -526,12 +556,18 @@ public class MainActivity extends Activity {
         super.onResume();
         isForeground = true;
         // 回到前台：停掉常驻保活服务，通知自动消失
-        KeepAliveService.stop(this);
-        if (webView != null) {
-            webView.onResume();
-            webView.evaluateJavascript(
-                    "window.AHNativePush&&AHNativePush.consumeIntoChat&&AHNativePush.consumeIntoChat();",
-                    null);
+        try {
+            KeepAliveService.stop(this);
+        } catch (Throwable ignored) {
+        }
+        try {
+            if (webView != null) {
+                webView.onResume();
+                webView.evaluateJavascript(
+                        "window.AHNativePush&&AHNativePush.consumeIntoChat&&AHNativePush.consumeIntoChat();",
+                        null);
+            }
+        } catch (Throwable ignored) {
         }
         // 热启动：回到前台时把之前攒的通知点击事件补投递
         flushPendingTap();
