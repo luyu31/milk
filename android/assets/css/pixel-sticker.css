@@ -30,8 +30,8 @@ html[data-theme="light"] body {
 /* ---------- 第三步：元素造型（贴纸感核心） ---------- */
 
 /* 3.1 基础卡片 —— 规范里的通用类 + 实际项目选择器映射 */
-.pixel-card,
-.message-bubble {
+html[data-theme="light"] .pixel-card,
+html[data-theme="light"] .message-bubble {
     background-color: #FFFFFF;
     border: 3px solid var(--outline-color) !important;
     border-radius: 16px !important;
@@ -120,8 +120,8 @@ html[data-theme="light"] .modal-btn-secondary:active:not(:disabled) {
 }
 
 /* 3.3 输入框（排除滑杆/勾选/文件选择，否则会被撑变形） */
-input:not([type="range"]):not([type="checkbox"]):not([type="radio"]):not([type="file"]),
-textarea {
+html[data-theme="light"] input:not([type="range"]):not([type="checkbox"]):not([type="radio"]):not([type="file"]),
+html[data-theme="light"] textarea {
     background-color: #FFFFFF;
     border: 3px solid var(--outline-color) !important;
     border-radius: 12px !important;
@@ -168,6 +168,32 @@ html[data-theme="light"] .env-tab-bar {
     background-color: #FFFFFF !important;
     border-top: 3px solid var(--outline-color) !important;
     border-bottom: 3px solid var(--outline-color) !important;
+}
+
+/* ---------- 像素图标（Header / 底部输入栏） ---------- */
+.px-icon {
+    width: 18px;
+    height: 18px;
+    display: block;
+    shape-rendering: crispEdges;
+    image-rendering: pixelated;
+    color: inherit;
+    flex-shrink: 0;
+}
+
+.input-btn .px-icon,
+.send-btn .px-icon {
+    width: 20px;
+    height: 20px;
+}
+
+html[data-theme="light"] .action-btn .px-icon,
+html[data-theme="light"] .input-btn .px-icon {
+    color: var(--outline-color);
+}
+
+html[data-theme="light"] .send-btn .px-icon {
+    color: #FFFFFF !important;
 }
 
 /* ---------- 第四步：去渐变 / 去毛玻璃 / 去模糊（限定在本层覆盖的容器上） ---------- */
