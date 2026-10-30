@@ -1,6 +1,0 @@
-.android-sdk/
-node_modules/
-npm-debug.log
-.DS_Store
-*.log
-.tmp/

@@ -2838,23 +2838,12 @@ playlist.style.top = (rect.top + (player.classList.contains('collapsed') ? 65 : 
 
         function initCoreListeners() {
 
-            // 批次 1 优化：scroll 事件用 requestAnimationFrame 节流，避免每帧回调里重复计算
-            var _scrollRafPending = false;
             DOMElements.chatContainer.addEventListener('scroll', () => {
-                if (_scrollRafPending) return;
-                _scrollRafPending = true;
-                requestAnimationFrame(() => {
-                    _scrollRafPending = false;
-                    const container = DOMElements.chatContainer;
-                    if (!container) return;
-                    var __s0 = performance.now();
-                    if (container.scrollTop < 50 && !isLoadingHistory && messages.length > displayedMessageCount) {
-                        if (typeof loadMoreHistory === 'function') loadMoreHistory();
-                    }
-                    if (window.__AH_PERF__ && window.__AH_PERF__.isEnabled()) {
-                        window.__AH_PERF__.mark('scrollHandler', performance.now() - __s0);
-                    }
-                });
+                const container = DOMElements.chatContainer;
+                if (!container) return;
+                if (container.scrollTop < 50 && !isLoadingHistory && messages.length > displayedMessageCount) {
+                    if (typeof loadMoreHistory === 'function') loadMoreHistory();
+                }
             });
 
             DOMElements.sendBtn.addEventListener('click', () => isBatchMode ? addToBatch(): sendMessage());

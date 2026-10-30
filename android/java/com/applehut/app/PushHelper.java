@@ -2,7 +2,6 @@ package com.applehut.app;
 
 import android.Manifest;
 import android.app.Notification;
-import android.app.NotificationChannel;
 import android.app.NotificationManager;
 import android.app.PendingIntent;
 import android.content.Context;
@@ -12,26 +11,20 @@ import android.os.Build;
 
 public final class PushHelper {
 
-    public static final String CHANNEL_ID = "ah_messages";
+    public static final String CHANNEL_ID = NotificationChannels.CHANNEL_MESSAGES;
     private static final String GROUP_KEY = "ah_messages_group";
     private static final int TAP_REQUEST = 1001;
+
+    /** 通知点击回传的 Intent extras key，MainActivity 靠这两个 key 精准跳转 */
+    public static final String EXTRA_SESSION_ID = "ah_session_id";
+    public static final String EXTRA_MESSAGE_ID = "ah_message_id";
+    public static final String EXTRA_FROM_PUSH = "from_push";
 
     private PushHelper() {
     }
 
     public static void ensureChannel(Context ctx) {
-        if (Build.VERSION.SDK_INT < 26) return;
-        try {
-            NotificationManager nm = (NotificationManager) ctx.getSystemService(Context.NOTIFICATION_SERVICE);
-            if (nm == null || nm.getNotificationChannel(CHANNEL_ID) != null) return;
-            NotificationChannel ch = new NotificationChannel(
-                    CHANNEL_ID, "Apple Hut 消息", NotificationManager.IMPORTANCE_HIGH);
-            ch.setDescription("对方发来的消息与后台推送");
-            ch.enableVibration(true);
-            ch.setShowBadge(true);
-            nm.createNotificationChannel(ch);
-        } catch (Throwable ignored) {
-        }
+        NotificationChannels.ensureAll(ctx);
     }
 
     public static boolean canNotify(Context ctx) {
@@ -52,17 +45,39 @@ public final class PushHelper {
     }
 
     public static boolean post(Context ctx, String title, String body) {
+        return post(ctx, title, body, null, null);
+    }
+
+    /**
+     * 发通知，并把 sessionId / messageId 塞进点击 Intent。
+     *
+     * 关键点：PendingIntent 的 requestCode 必须每条通知不同，
+     * 否则 FLAG_UPDATE_CURRENT 会让所有通知共享同一份 extras，
+     * 用户点旧通知会跳到最新那条消息（典型的"幽灵通知"）。
+     */
+    public static boolean post(Context ctx, String title, String body,
+                               String sessionId, String messageId) {
         if (!canNotify(ctx)) return false;
         ensureChannel(ctx);
         try {
+            int id = (int) (System.currentTimeMillis() % 1000000) + 1000;
+
             Intent intent = new Intent(ctx, MainActivity.class);
             intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK
                     | Intent.FLAG_ACTIVITY_CLEAR_TOP
                     | Intent.FLAG_ACTIVITY_SINGLE_TOP);
-            intent.putExtra("from_push", true);
+            intent.putExtra(EXTRA_FROM_PUSH, true);
+            if (sessionId != null && !sessionId.isEmpty()) {
+                intent.putExtra(EXTRA_SESSION_ID, sessionId);
+            }
+            if (messageId != null && !messageId.isEmpty()) {
+                intent.putExtra(EXTRA_MESSAGE_ID, messageId);
+            }
+
             int piFlags = PendingIntent.FLAG_UPDATE_CURRENT;
             if (Build.VERSION.SDK_INT >= 23) piFlags |= PendingIntent.FLAG_IMMUTABLE;
-            PendingIntent pi = PendingIntent.getActivity(ctx, TAP_REQUEST, intent, piFlags);
+            // requestCode 用 id，保证每条通知的 extras 独立
+            PendingIntent pi = PendingIntent.getActivity(ctx, id, intent, piFlags);
 
             Notification.Builder builder;
             if (Build.VERSION.SDK_INT >= 26) {
@@ -87,7 +102,6 @@ public final class PushHelper {
 
             NotificationManager nm = (NotificationManager) ctx.getSystemService(Context.NOTIFICATION_SERVICE);
             if (nm == null) return false;
-            int id = (int) (System.currentTimeMillis() % 1000000) + 1000;
             nm.notify(id, builder.build());
             return true;
         } catch (Throwable t) {

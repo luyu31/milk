@@ -82,14 +82,190 @@
         } catch (e) {}
     }
 
-    function notify(title, body) {
-        if (!native || !hasPermission()) return false;
+    /* ---------- 通知点击精准跳转：localStorage 标记桥接 ----------
+     *
+     * 纯 JS 层方案（不改原生代码）：
+     *   - 发原生通知前，把 sessionId / messageId 存进 localStorage 标记
+     *   - 冷启动（JS 加载完）或热启动（visibilitychange visible）时，检查标记
+     *     → 有标记且在最近 10 分钟内 → 切会话 + 定位消息 + 高亮 1.5s
+     *     → 无标记或过期 → 跳过（是用户手动切回 App）
+     *   - 所有 bridge 调用都 try-catch 静默降级，绝不崩溃
+     */
+    var PENDING_KEY = 'AH_PENDING_NOTIF';
+    var PENDING_TTL_MS = 10 * 60 * 1000; // 10 分钟有效
+
+    function writePendingClick(payload) {
+        if (!payload || !payload.sessionId) return;
         try {
-            bridge.notify(title || 'Apple Hut', body || '对方发来了消息');
-            return true;
-        } catch (e) {
-            return false;
+            localStorage.setItem(PENDING_KEY, JSON.stringify({
+                sessionId: payload.sessionId,
+                messageId: payload.messageId || null,
+                at: Date.now()
+            }));
+        } catch (e) {}
+    }
+
+    function readPendingClick() {
+        try {
+            var raw = localStorage.getItem(PENDING_KEY);
+            if (!raw) return null;
+            var obj = JSON.parse(raw);
+            if (!obj || !obj.sessionId) return null;
+            // TTL 检查：10 分钟外的过期标记清除掉
+            if (obj.at && (Date.now() - obj.at) > PENDING_TTL_MS) {
+                try { localStorage.removeItem(PENDING_KEY); } catch (e) {}
+                return null;
+            }
+            return obj;
+        } catch (e) { return null; }
+    }
+
+    function clearPendingClick() {
+        try { localStorage.removeItem(PENDING_KEY); } catch (e) {}
+    }
+
+    /**
+     * 执行通知点击跳转：切会话 + 滚动定位 + 高亮
+     * 不依赖任何原生能力，纯 DOM 操作
+     */
+    function doNavigateToMessage(payload) {
+        if (!payload || !payload.sessionId) return false;
+        var sid = payload.sessionId;
+        var mid = payload.messageId;
+        var navigated = false;
+
+        try {
+            // 1. 切换会话（如果当前不是目标会话）
+            var currentSid = null;
+            try { currentSid = (typeof SESSION_ID !== 'undefined') ? SESSION_ID : null; } catch (e) {}
+
+            if (currentSid && currentSid !== sid) {
+                // 调用 App 里已有的切换会话逻辑
+                var sw = typeof window.switchSession === 'function' ? window.switchSession
+                       : (typeof window.AppCore !== 'undefined' && window.AppCore.switchSession) || null;
+                if (sw) {
+                    try { sw(sid); navigated = true; } catch (e) { navigated = false; }
+                }
+            } else if (currentSid === sid) {
+                navigated = true;
+            }
+        } catch (e) {}
+
+        // 2. 如果 mid 有值 → 滚动定位 + 高亮
+        if (mid && navigated) {
+            setTimeout(function () {
+                highlightAndScrollTo(mid);
+            }, 350); // 给会话切换 + renderMessages 一点时间
         }
+
+        // 3. 同时派发 AppCore.events（如果存在）
+        try {
+            if (window.AppCore && window.AppCore.events) {
+                window.AppCore.events.emit('notification-click', payload);
+            }
+        } catch (e) {}
+
+        return navigated;
+    }
+
+    function highlightAndScrollTo(messageId) {
+        // 先从 DOM 里找（messageId 可能作为 data 属性）
+        var node = null;
+        var selectors = [
+            '[data-message-id="' + messageId + '"]',
+            '[data-id="' + messageId + '"]',
+            '[data-msg-id="' + messageId + '"]'
+        ];
+        for (var i = 0; i < selectors.length && !node; i++) {
+            try { node = document.querySelector(selectors[i]); } catch (e) {}
+        }
+        // 退一步：用 messageId 包含的内容（比如时间戳 id）匹配文本
+        if (!node) {
+            try {
+                var allMsgs = document.querySelectorAll('[class*="message"]');
+                for (var j = 0; j < allMsgs.length; j++) {
+                    var el = allMsgs[j];
+                    if (el.id && String(el.id).indexOf(messageId) !== -1) { node = el; break; }
+                }
+            } catch (e) {}
+        }
+        if (!node) {
+            // 最后：滚动到聊天容器底部（最常见的"定位到最新消息"场景）
+            try {
+                var container = document.getElementById('chat-container')
+                             || document.querySelector('.chat-container')
+                             || document.querySelector('[class*="chat-container"]');
+                if (container) container.scrollTop = container.scrollHeight;
+            } catch (e) {}
+            return;
+        }
+        try {
+            node.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        } catch (e) {}
+        // 高亮闪烁 1.5s
+        try {
+            node.style.transition = 'box-shadow .15s';
+            node.style.boxShadow = '0 0 0 3px rgba(var(--accent-color-rgb),.45)';
+            setTimeout(function () {
+                try { node.style.boxShadow = 'none'; } catch (e) {}
+            }, 1500);
+        } catch (e) {}
+    }
+
+    /**
+     * 对外暴露：消费待投递的通知点击事件
+     * 入口：冷启动后 DOMContentLoaded 调一次，热启动 visibilitychange visible 调一次
+     */
+    function consumePendingNotificationClick() {
+        var p = readPendingClick();
+        if (!p) return false;
+        // 先清标记（防止递归）
+        clearPendingClick();
+        // 再执行跳转（内部会 emit AppCore.events）
+        try { return doNavigateToMessage(p); } catch (e) { return false; }
+    }
+
+    // 全局暴露：让任何 JS 都能手动触发（比如未来原生层真能推带 payload 的 intent extras）
+    window.handleNotificationClickFromStorage = consumePendingNotificationClick;
+    window.AHNativePushConsumeClick = consumePendingNotificationClick;
+
+    // 也让原生桥接层（如果未来 Java 侧补了 payload 回传）能直接调
+    window.handleNotificationClick = function (sessionId, messageId) {
+        return doNavigateToMessage({ sessionId: sessionId, messageId: messageId });
+    };
+
+    /* ---------- notify 增强：带 payload 写入 localStorage ---------- */
+    function notify(title, body, opt) {
+        opt = opt || {};
+        // 兜底：没传 sessionId 但全局 SESSION_ID 有值 → 自动用
+        var sid = opt.sessionId;
+        var mid = opt.messageId;
+        if (!sid) {
+            try { sid = (typeof SESSION_ID !== 'undefined') ? SESSION_ID : null; } catch (e) { sid = null; }
+        }
+        // 先发通知
+        var ok = false;
+        try {
+            if (native && hasPermission()) {
+                if (typeof bridge.notifyWithPayload === 'function' && sid) {
+                    // 原生通知携带 sessionId/messageId，点击后原生层可直接精准跳转
+                    bridge.notifyWithPayload(title || 'Apple Hut',
+                            body || '对方发来了消息', sid, mid || '');
+                } else {
+                    bridge.notify(title || 'Apple Hut', body || '对方发来了消息');
+                }
+                ok = true;
+            }
+        } catch (e) { ok = false; }
+        // 无论原生通知有没有发成功，只要有 sessionId 就写标记
+        // （万一 Web Notification 走 fallback，也能支持跳转）
+        if (sid) {
+            writePendingClick({
+                sessionId: sid,
+                messageId: mid || null
+            });
+        }
+        return ok;
     }
 
     /* ---------- 用原生通知替换 Web Notification ---------- */
@@ -218,7 +394,8 @@
             var sid = String(item.sessionId || SESSION_ID);
             var ts = parseInt(item.ts, 10) || Date.now();
             var msg = {
-                id: String(ts) + '_push_' + i + '_' + Math.random().toString(36).slice(2, 6),
+                // 原生通知带的 messageId 优先，保证「点通知」能精确定位到这条
+                id: String(item.messageId || (String(ts) + '_push_' + i + '_' + Math.random().toString(36).slice(2, 6))),
                 sender: item.sender || partnerName,
                 text: text,
                 timestamp: new Date(ts),
@@ -288,16 +465,45 @@
         refreshUI();
     }
 
+    /* ---------- 后台常驻保活（原生 Foreground Service）---------- */
+    function startKeepAlive() {
+        try {
+            if (native && typeof bridge.startKeepAlive === 'function') bridge.startKeepAlive();
+        } catch (e) {}
+    }
+
+    function stopKeepAlive() {
+        try {
+            if (native && typeof bridge.stopKeepAlive === 'function') bridge.stopKeepAlive();
+        } catch (e) {}
+    }
+
+    function isKeepAliveRunning() {
+        try {
+            if (native && typeof bridge.isKeepAliveRunning === 'function') return !!bridge.isKeepAliveRunning();
+        } catch (e) {}
+        return false;
+    }
+
     document.addEventListener('DOMContentLoaded', function () {
         bootSync();
         setTimeout(bootSync, 1500);
         setTimeout(bootSync, 6000);
+        // 冷启动：如果用户之前点了通知，标记可能还在
+        setTimeout(function () { try { consumePendingNotificationClick(); } catch (e) {} }, 2500);
     });
     window.addEventListener('load', bootSync);
 
     document.addEventListener('visibilitychange', function () {
-        if (document.visibilityState === 'hidden') syncConfig();
-        else { bootSync(); }
+        if (document.visibilityState === 'hidden') {
+            syncConfig();
+            startKeepAlive();
+        } else {
+            bootSync();
+            stopKeepAlive();
+            // 热启动：用户可能刚点了通知切回来
+            try { consumePendingNotificationClick(); } catch (e) {}
+        }
     });
 
     setInterval(function () {
@@ -314,6 +520,14 @@
         sync: syncConfig,
         refreshUI: refreshUI,
         consumeIntoChat: consumeIntoChat,
+        consumePendingNotificationClick: consumePendingNotificationClick,
+        writePendingClick: writePendingClick,
+        readPendingClick: readPendingClick,
+        clearPendingClick: clearPendingClick,
+        navigateToMessage: doNavigateToMessage,
+        startKeepAlive: startKeepAlive,
+        stopKeepAlive: stopKeepAlive,
+        isKeepAliveRunning: isKeepAliveRunning,
         getInterval: getInterval,
         syncConfig: syncConfig,
         toggleEnabled: function (on) {

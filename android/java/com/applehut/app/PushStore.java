@@ -84,6 +84,11 @@ public final class PushStore {
     }
 
     public static synchronized void queueAdd(Context ctx, String text, long ts, String sessionId, String sender) {
+        queueAdd(ctx, text, ts, sessionId, sender, null);
+    }
+
+    public static synchronized void queueAdd(Context ctx, String text, long ts, String sessionId,
+                                             String sender, String messageId) {
         try {
             SharedPreferences prefs = sp(ctx);
             JSONArray queue = new JSONArray(prefs.getString(K_QUEUE, "[]"));
@@ -92,6 +97,9 @@ public final class PushStore {
             item.put("ts", ts);
             item.put("sessionId", sessionId == null ? "" : sessionId);
             item.put("sender", sender == null ? "对方" : sender);
+            if (messageId != null && !messageId.isEmpty()) {
+                item.put("messageId", messageId);
+            }
             queue.put(item);
             while (queue.length() > 10) {
                 queue.remove(0);
