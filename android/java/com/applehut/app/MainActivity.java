@@ -53,9 +53,14 @@ public class MainActivity extends Activity {
     /** 页面 JS 是否已就绪（onPageFinished 置 true） */
     private volatile boolean jsReady = false;
 
-    /** 冷启动时先攒着，等 JS 就绪再投递 */
-    private String pendingTapSession = null;
-    private String pendingTapMessage = null;
+    /** 当前是否通话中（由前端 AppleHut.setInCall 同步，onPause 时决定要不要启保活） */
+    private volatile boolean inCall = false;
+
+    /**
+     * 积压的通知点击，每条为 [sessionId, messageId]。
+     * JS 就绪后只投递队列尾部一条，其余直接清空，避免恢复时连续跳转多次。
+     */
+    private final java.util.ArrayDeque<String[]> pendingTaps = new java.util.ArrayDeque<>();
 
     private static final Map<String, String> MIME = new HashMap<>();
 
@@ -211,8 +216,12 @@ public class MainActivity extends Activity {
             String mid = intent.getStringExtra(PushHelper.EXTRA_MESSAGE_ID);
             boolean fromPush = intent.getBooleanExtra(PushHelper.EXTRA_FROM_PUSH, false);
             if (sid == null && !fromPush) return;
-            pendingTapSession = sid;
-            pendingTapMessage = mid;
+            synchronized (pendingTaps) {
+                pendingTaps.addLast(new String[]{sid, mid});
+                while (pendingTaps.size() > 5) {
+                    pendingTaps.pollFirst();
+                }
+            }
             // 消费掉，避免旋转/重建时重复跳转
             intent.removeExtra(PushHelper.EXTRA_SESSION_ID);
             intent.removeExtra(PushHelper.EXTRA_MESSAGE_ID);
@@ -227,11 +236,17 @@ public class MainActivity extends Activity {
      */
     private void flushPendingTap() {
         if (!jsReady || webView == null) return;
-        final String sid = pendingTapSession;
-        final String mid = pendingTapMessage;
+
+        // 只取队列尾部（最新一次点击）一条，其余全部丢弃，不逐条投递
+        final String[] last;
+        synchronized (pendingTaps) {
+            if (pendingTaps.isEmpty()) return;
+            last = pendingTaps.peekLast();
+            pendingTaps.clear();
+        }
+        final String sid = last[0];
+        final String mid = last[1];
         if (sid == null && mid == null) return;
-        pendingTapSession = null;
-        pendingTapMessage = null;
 
         final String js;
         if (sid != null) {
@@ -345,7 +360,8 @@ public class MainActivity extends Activity {
         /** 前端同步通话状态：通话中不启后台保活 */
         @JavascriptInterface
         public void setInCall(boolean inCall) {
-            KeepAliveService.inCall = inCall;
+            MainActivity.this.inCall = inCall;
+            KeepAliveService.inCall = inCall;   // 服务内部再存一份兜底
             if (inCall) {
                 KeepAliveService.stop(MainActivity.this);
             } else if (!isForeground) {
@@ -498,8 +514,10 @@ public class MainActivity extends Activity {
         if (webView != null) {
             webView.onPause();
         }
-        // 退到后台：拉起常驻保活服务（通话中会自动跳过）
-        KeepAliveService.start(this);
+        // 退到后台：拉起常驻保活服务（通话中 / 正在销毁时不启）
+        if (!inCall && !isFinishing()) {
+            KeepAliveService.start(this);
+        }
         super.onPause();
     }
 

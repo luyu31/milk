@@ -7,6 +7,7 @@ import android.app.PendingIntent;
 import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
+import android.net.Uri;
 import android.os.Build;
 
 public final class PushHelper {
@@ -73,9 +74,11 @@ public final class PushHelper {
             if (messageId != null && !messageId.isEmpty()) {
                 intent.putExtra(EXTRA_MESSAGE_ID, messageId);
             }
+            // 每条通知带唯一的 data URI，让 PendingIntent 天然互不冲突（第二道保险）
+            intent.setData(Uri.parse("ah://msg/"
+                    + (messageId != null && !messageId.isEmpty() ? messageId : String.valueOf(id))));
 
-            int piFlags = PendingIntent.FLAG_UPDATE_CURRENT;
-            if (Build.VERSION.SDK_INT >= 23) piFlags |= PendingIntent.FLAG_IMMUTABLE;
+            int piFlags = PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE;
             // requestCode 用 id，保证每条通知的 extras 独立
             PendingIntent pi = PendingIntent.getActivity(ctx, id, intent, piFlags);
 
