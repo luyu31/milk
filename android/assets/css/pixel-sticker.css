@@ -1,0 +1,218 @@
+/* ============================================================
+   Apple Hut · 复古像素 / 贴纸 UI 层
+   加载顺序：styles.css → applehut.css → pixel-sticker.css（最后）
+   只在浅色主题生效，深色主题保持原样，避免白卡片刺眼。
+   ============================================================ */
+
+/* ---------- 第一步：全局设计变量（吸色自像素封面） ---------- */
+:root {
+    --bg-cream: #FDF7ED;        /* 背景色：温暖的奶油米黄 */
+    --apple-red: #E9504E;       /* 主体红：高饱和苹果红 */
+    --apple-light: #F19A96;     /* 高光粉：苹果左侧的高光色 */
+    --apple-dark: #C13634;      /* 阴影红：苹果底部的暗部色 */
+    --stem-brown: #8B5A2B;      /* 树枝深棕色 */
+    --leaf-green: #4F9F3F;      /* 叶子草绿色 */
+    --outline-color: #33201A;   /* 描边色：极深的红棕色，绝不用纯黑 */
+    --eye-black: #2A1B16;       /* 眼睛/嘴巴深色 */
+}
+
+/* ---------- 第二步：全局字体与图像渲染 ---------- */
+html[data-theme="light"] body {
+    background-color: var(--bg-cream) !important;
+    background-image: none !important;
+    font-family: 'ZCOOL QingKe HuangYou', 'Courier New', monospace !important;
+    color: var(--outline-color);
+    /* 禁用字体平滑，强调像素感 */
+    -webkit-font-smoothing: none;
+    image-rendering: pixelated;
+}
+
+/* ---------- 第三步：元素造型（贴纸感核心） ---------- */
+
+/* 3.1 基础卡片 —— 规范里的通用类 + 实际项目选择器映射 */
+html[data-theme="light"] .pixel-card,
+html[data-theme="light"] .message-bubble {
+    background-color: #FFFFFF;
+    border: 3px solid var(--outline-color) !important;
+    border-radius: 16px !important;
+    /* 实心偏移阴影，零模糊，模拟贴纸 */
+    box-shadow: 4px 4px 0px var(--outline-color) !important;
+    margin-bottom: 16px;
+}
+
+html[data-theme="light"] .modal-content,
+html[data-theme="light"] .settings-card,
+html[data-theme="light"] .cs-card,
+html[data-theme="light"] .summer-daylight-card {
+    background-color: #FFFFFF !important;
+    background-image: none !important;
+    border: 3px solid var(--outline-color) !important;
+    border-radius: 16px !important;
+    box-shadow: 4px 4px 0px var(--outline-color) !important;
+}
+
+/* 默认气泡风格（standard）也变成贴纸边 */
+html[data-theme="light"] .message.standard {
+    border: 3px solid var(--outline-color) !important;
+    border-radius: 16px !important;
+    box-shadow: 4px 4px 0px var(--outline-color) !important;
+    background-image: none !important;
+}
+
+/* 3.2 主按钮 */
+.btn-primary {
+    background-color: var(--apple-red) !important;
+    color: #FFFFFF !important;
+    border: 3px solid var(--outline-color) !important;
+    border-radius: 12px !important;
+    box-shadow: 3px 3px 0px var(--outline-color) !important;
+    font-size: 16px;
+    padding: 10px 20px;
+    transition: all 0.1s;
+}
+
+.btn-primary:active {
+    transform: translate(3px, 3px);
+    box-shadow: none !important;
+}
+
+html[data-theme="light"] .modal-btn-primary {
+    background-color: var(--apple-red) !important;
+    color: #FFFFFF !important;
+    border: 3px solid var(--outline-color) !important;
+    border-radius: 12px !important;
+    box-shadow: 3px 3px 0px var(--outline-color) !important;
+    font-weight: 400 !important;
+    transition: all 0.1s;
+}
+
+html[data-theme="light"] .modal-btn-primary:hover:not(:disabled) {
+    filter: none !important;
+    transform: none;
+}
+
+html[data-theme="light"] .modal-btn-primary:active:not(:disabled) {
+    transform: translate(3px, 3px);
+    box-shadow: none !important;
+}
+
+/* 次级按钮：白底 + 硬描边，一样是贴纸 */
+html[data-theme="light"] .modal-btn,
+html[data-theme="light"] .modal-btn-secondary {
+    background-color: #FFFFFF !important;
+    color: var(--outline-color) !important;
+    border: 3px solid var(--outline-color) !important;
+    border-radius: 12px !important;
+    box-shadow: 3px 3px 0px var(--outline-color) !important;
+    font-weight: 400 !important;
+    transition: all 0.1s;
+}
+
+html[data-theme="light"] .modal-btn-secondary:hover:not(:disabled) {
+    background-color: #FFFFFF !important;
+    transform: none;
+}
+
+html[data-theme="light"] .modal-btn:active:not(:disabled),
+html[data-theme="light"] .modal-btn-secondary:active:not(:disabled) {
+    transform: translate(3px, 3px);
+    box-shadow: none !important;
+}
+
+/* 3.3 输入框（排除滑杆/勾选/文件选择，否则会被撑变形） */
+html[data-theme="light"] input:not([type="range"]):not([type="checkbox"]):not([type="radio"]):not([type="file"]),
+html[data-theme="light"] textarea {
+    background-color: #FFFFFF;
+    border: 3px solid var(--outline-color) !important;
+    border-radius: 12px !important;
+    padding: 10px;
+    font-family: inherit;
+    outline: none;
+    box-shadow: inset 2px 2px 0px rgba(51, 32, 26, 0.1);
+}
+
+html[data-theme="light"] .modal-input,
+html[data-theme="light"] .modal-textarea {
+    background-color: #FFFFFF !important;
+    border: 3px solid var(--outline-color) !important;
+    border-radius: 12px !important;
+    box-shadow: inset 2px 2px 0px rgba(51, 32, 26, 0.1) !important;
+}
+
+html[data-theme="light"] .modal-input:focus,
+html[data-theme="light"] .modal-textarea:focus {
+    border-color: var(--apple-red) !important;
+}
+
+/* 3.4 导航 / 标签栏 */
+.nav-bar,
+.tab-bar {
+    background-color: #FFFFFF !important;
+    border-top: 3px solid var(--outline-color) !important;
+    border-bottom: 3px solid var(--outline-color) !important;
+    box-shadow: 0px -3px 0px rgba(51, 32, 26, 0.05);
+}
+
+html[data-theme="light"] .header {
+    background-color: #FFFFFF !important;
+    background-image: none !important;
+    border-bottom: 3px solid var(--outline-color) !important;
+    box-shadow: 0 3px 0 rgba(51, 32, 26, 0.05) !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+}
+
+html[data-theme="light"] .cs-tabs,
+html[data-theme="light"] .combo-tabs-header,
+html[data-theme="light"] .env-tab-bar {
+    background-color: #FFFFFF !important;
+    border-top: 3px solid var(--outline-color) !important;
+    border-bottom: 3px solid var(--outline-color) !important;
+}
+
+/* ---------- 像素图标（Header / 底部输入栏） ---------- */
+.px-icon {
+    width: 18px;
+    height: 18px;
+    display: block;
+    shape-rendering: crispEdges;
+    image-rendering: pixelated;
+    color: inherit;
+    flex-shrink: 0;
+}
+
+.input-btn .px-icon,
+.send-btn .px-icon {
+    width: 20px;
+    height: 20px;
+}
+
+html[data-theme="light"] .action-btn .px-icon,
+html[data-theme="light"] .input-btn .px-icon {
+    color: var(--outline-color);
+}
+
+html[data-theme="light"] .send-btn .px-icon {
+    color: #FFFFFF !important;
+}
+
+/* ---------- 第四步：去渐变 / 去毛玻璃 / 去模糊（限定在本层覆盖的容器上） ---------- */
+html[data-theme="light"] .modal {
+    background-color: rgba(51, 32, 26, 0.55) !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+}
+
+/* 图标按钮统一描边 */
+html[data-theme="light"] .action-btn,
+html[data-theme="light"] .modal-btn,
+html[data-theme="light"] .settings-item {
+    filter: none !important;
+}
+
+/* 头像保持圆形，但加上贴纸描边 */
+html[data-theme="light"] .message-wrapper .avatar,
+html[data-theme="light"] .avatar-container .avatar {
+    border: 3px solid var(--outline-color) !important;
+    box-shadow: 2px 2px 0 var(--outline-color) !important;
+}
