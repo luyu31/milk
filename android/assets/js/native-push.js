@@ -806,13 +806,18 @@
 
     window.openPushPanel = function () {
         var modal = ensurePushPanel();
-        modal.style.display = 'flex';
+        // 必须走全局 showModal：.modal-content 默认 opacity:0，
+        // 只有 showModal 会把它设为 1，直接 display:flex 会得到空白面板。
+        if (typeof showModal === 'function') showModal(modal);
+        else modal.style.display = 'flex';
         renderPushPanel();
         refreshPushBrief();
     };
     window.closePushPanel = function () {
         var modal = document.getElementById('ah-push-modal');
-        if (modal) modal.style.display = 'none';
+        if (!modal) return;
+        if (typeof hideModal === 'function') hideModal(modal);
+        else modal.style.display = 'none';
     };
     window.refreshPushBrief = refreshPushBrief;
 
