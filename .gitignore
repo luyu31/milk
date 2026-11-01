@@ -1,0 +1,5 @@
+# 签名材料：任何私钥、密钥库、口令文件都不得入库
+*.jks
+*.keystore
+keystore.properties
+*.b64
