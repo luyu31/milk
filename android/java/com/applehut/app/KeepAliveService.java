@@ -1,8 +1,8 @@
 package com.applehut.app;
 
 import android.app.Notification;
+import android.app.NotificationManager;
 import android.app.PendingIntent;
-import android.app.Service;
 import android.content.Context;
 import android.content.Intent;
 import android.content.pm.ServiceInfo;
@@ -10,12 +10,12 @@ import android.os.Build;
 import android.os.IBinder;
 
 /**
- * 后台常驻保活服务（微信式通知栏常驻）。
+ * 后台常驻保活服务（前台服务，不可被用户滑动清除）。
  *
- * 行为：
- *   - App 退到后台（Activity onPause）时拉起，通知栏挂一条不可滑除的常驻通知
+ * 行为（改动后）：
+ *   - App 退到后台（Activity onPause）时拉起，通知栏挂一条常驻通知
+ *   - 通话中也照常拉起，只是通知文案改为"通话中"，保持进程存活
  *   - App 回到前台（Activity onResume）时停止，通知自动消失
- *   - 通话中不启（通话有自己的保活通知，避免两条常驻打架）
  *
  * 系统约束：
  *   - Android 8.0+ 必须走 startForeground，5 秒内挂通知
@@ -36,7 +36,6 @@ public class KeepAliveService extends Service {
     }
 
     public static void start(Context ctx) {
-        if (inCall) return; // 通话中不启后台保活
         try {
             Intent i = new Intent(ctx, KeepAliveService.class);
             if (Build.VERSION.SDK_INT >= 26) {
@@ -70,7 +69,7 @@ public class KeepAliveService extends Service {
     public int onStartCommand(Intent intent, int flags, int startId) {
         // 关键：Android 12+ 规定 startForegroundService 后必须尽快调用 startForeground，
         // 超时（5s）会抛 ForegroundServiceDidNotStartInTimeException，直接把整个进程杀掉。
-        // 所以这里改成「先无条件挂通知，再判断通话状态」，绝不允许路径绕过 startForeground。
+        // 所以这里改成「先无条件挂通知」，绝不允许任何路径绕过 startForeground。
         Notification n = null;
         try {
             NotificationChannels.ensureAll(this);
@@ -88,7 +87,6 @@ public class KeepAliveService extends Service {
                 startForeground(NOTIF_ID, n);
             }
         } catch (Throwable t) {
-            // API 34 类型不被允许等情况：退回不带 type 的老写法
             try {
                 startForeground(NOTIF_ID, n);
             } catch (Throwable ignored) {
@@ -96,15 +94,13 @@ public class KeepAliveService extends Service {
             stopSelf();
             return START_NOT_STICKY;
         }
-        if (inCall) {
-            // 通话中：保活通知已挂上，随即退出，避免和通话保活通知重复
-            stopSelf();
-            return START_NOT_STICKY;
-        }
         return START_STICKY;
     }
 
     private Notification buildNotification() {
+        // 通话中：用专属通知渠道、通话专属文案；其余用通用常驻保活
+        String channelId = inCall ? NotificationChannels.CHANNEL_CALL : NotificationChannels.CHANNEL_OTHER;
+
         Intent open = new Intent(this, MainActivity.class);
         open.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK
                 | Intent.FLAG_ACTIVITY_CLEAR_TOP
@@ -118,18 +114,30 @@ public class KeepAliveService extends Service {
 
         Notification.Builder b;
         if (Build.VERSION.SDK_INT >= 26) {
-            b = new Notification.Builder(this, NotificationChannels.CHANNEL_OTHER);
+            b = new Notification.Builder(this, channelId);
         } else {
             b = new Notification.Builder(this);
         }
-        b.setSmallIcon(R.drawable.ic_stat_apple)
-                .setContentTitle("Apple Hut 正在后台运行")
-                .setContentText("保持连接，随时接收新消息")
-                .setOngoing(true)                        // 不可被用户滑动清除
-                .setAutoCancel(false)
-                .setShowWhen(false)
-                .setPriority(Notification.PRIORITY_LOW)
-                .setCategory(Notification.CATEGORY_SERVICE);
+
+        if (inCall) {
+            b.setSmallIcon(R.drawable.ic_stat_apple)
+                    .setContentTitle("Apple Hut · 通话中")
+                    .setContentText("点按回到通话界面")
+                    .setOngoing(true)
+                    .setAutoCancel(false)
+                    .setShowWhen(false)
+                    .setPriority(Notification.PRIORITY_HIGH)
+                    .setCategory(Notification.CATEGORY_CALL);
+        } else {
+            b.setSmallIcon(R.drawable.ic_stat_apple)
+                    .setContentTitle("Apple Hut 正在后台运行")
+                    .setContentText("保持连接，随时接收新消息")
+                    .setOngoing(true)
+                    .setAutoCancel(false)
+                    .setShowWhen(false)
+                    .setPriority(Notification.PRIORITY_LOW)
+                    .setCategory(Notification.CATEGORY_SERVICE);
+        }
         if (pi != null) {
             b.setContentIntent(pi);
         }
@@ -151,7 +159,8 @@ public class KeepAliveService extends Service {
 
     @Override
     public void onTaskRemoved(Intent rootIntent) {
-        // 用户从最近任务里划掉 App：服务已被系统杀死，这里不做事（重启由 START_STICKY 兜底）
+        // 用户从最近任务里划掉 App：服务会被系统杀死，这里不做事。
+        // 进程被杀后 JS 不存在了，通话自然断开，这正是用户想要的"清后台才挂断"。
         super.onTaskRemoved(rootIntent);
     }
 

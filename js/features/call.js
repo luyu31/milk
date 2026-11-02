@@ -1019,15 +1019,26 @@ html:not([data-theme="dark"])[data-color-theme="black-white"] .message-sent{
         bindEvents();
         loadBg();
 
-        // 退出/隐藏时自动挂断并留下记录
-        const autoQuitHandler = () => {
+        // 切到后台（Home / 切换 App）→ 最小化通话窗口到迷你悬浮窗，通话继续进行。
+        // 真正退出/清后台（Activity.onDestroy / 进程被杀）时才挂断。
+        const autoHangupHandler = () => {
             if (S.active) endCall('auto-quit');
         };
         document.addEventListener('visibilitychange', () => {
-            if (document.visibilityState === 'hidden') autoQuitHandler();
+            if (document.visibilityState === 'hidden') {
+                // 后台：把通话窗口最小化成悬浮球，通话继续
+                if (S.active && !S.minimized) {
+                    try { minimizeWindow(); } catch (e) {}
+                }
+            } else if (document.visibilityState === 'visible') {
+                // 回到前台：从悬浮球恢复窗口
+                if (S.active && S.minimized) {
+                    try { restoreWindow(); } catch (e) {}
+                }
+            }
         });
-        window.addEventListener('pagehide', autoQuitHandler);
-        // Android WebView 中 beforeunload 不一定触发，visibilitychange/pagehide 更可靠
+        // Activity 被销毁 / 进程被清后台时触发（Android WebView 中这比 visibilitychange 更接近"真退出"）
+        window.addEventListener('beforeunload', autoHangupHandler);
 
         const late = () => {
             injectToolbarBtn();

@@ -365,15 +365,14 @@ public class MainActivity extends Activity {
             }
         }
 
-        /** 前端同步通话状态：通话中不启后台保活 */
+        /** 前端同步通话状态：同时保活服务，只是通知文案不同 */
         @JavascriptInterface
         public void setInCall(boolean inCall) {
             try {
                 MainActivity.this.inCall = inCall;
                 KeepAliveService.inCall = inCall;   // 服务内部再存一份兜底
-                if (inCall) {
-                    KeepAliveService.stop(MainActivity.this);
-                } else if (!isForeground) {
+                if (!isForeground) {
+                    // 后台：启动/刷新保活服务（通话中也照常启动，只是通知文案改为"通话中"）
                     KeepAliveService.start(MainActivity.this);
                 }
             } catch (Throwable ignored) {
@@ -541,9 +540,9 @@ public class MainActivity extends Activity {
             }
         } catch (Throwable ignored) {
         }
-        // 退到后台：拉起常驻保活服务（通话中 / 正在销毁时不启）
+        // 退到后台：拉起常驻保活服务（包含通话中；只有正在销毁时不启）
         try {
-            if (!inCall && !isFinishing()) {
+            if (!isFinishing()) {
                 KeepAliveService.start(this);
             }
         } catch (Throwable ignored) {
