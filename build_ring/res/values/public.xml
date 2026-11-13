@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <public type="color" name="apple_green" id="0x7f010000" />
+    <public type="color" name="apple_red" id="0x7f010001" />
+    <public type="color" name="cream" id="0x7f010002" />
+    <public type="drawable" name="ic_stat_apple" id="0x7f020000" />
+    <public type="drawable" name="launch_background" id="0x7f020001" />
+    <public type="drawable" name="splash_logo" id="0x7f020002" />
+    <public type="mipmap" name="ic_launcher" id="0x7f030000" />
+    <public type="mipmap" name="ic_launcher_foreground" id="0x7f030001" />
+    <public type="mipmap" name="ic_launcher_round" id="0x7f030002" />
+    <public type="string" name="app_name" id="0x7f040000" />
+    <public type="style" name="AppTheme" id="0x7f050000" />
+</resources>

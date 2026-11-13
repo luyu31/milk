@@ -1,0 +1,49 @@
+/* ============================================================
+   Apple Hut · 像素封面样式（仅封面，绝不外溢到 App 内部页面）
+   所有选择器都以 #applehut-cover 为根，离开封面页即完全失效。
+   ============================================================ */
+
+/* 封面用色（与 art/cover.png 吸色一致） */
+:root {
+    --ah-cream: #FDF7ED;
+    --ah-apple-red: #E9504E;
+    --ah-apple-light: #F19A96;
+    --ah-outline: #33201A;
+}
+
+/* 封面整体背景（只作用于封面遮罩本身，不碰 body） */
+#applehut-cover {
+    background: var(--ah-cream, #FDF7ED) !important;
+}
+
+/* 副标题：白色贴纸 + 3px 深棕描边 + 实心偏移阴影 */
+#applehut-cover .applehut-cover-sub {
+    background: #ffffff !important;
+    border: 3px solid var(--ah-outline, #33201A) !important;
+    border-radius: 10px !important;
+    box-shadow: 3px 3px 0 var(--ah-outline, #33201A) !important;
+    color: var(--ah-outline, #33201A) !important;
+    font-family: 'ZCOOL QingKe HuangYou', 'Courier New', monospace !important;
+    font-weight: 400 !important;
+}
+
+/* 进入按钮：苹果红 + 白字 + 硬阴影，按下位移并去掉阴影 */
+#applehut-cover .applehut-cover-enter {
+    background: var(--ah-apple-red, #E9504E) !important;
+    border: 3px solid var(--ah-outline, #33201A) !important;
+    border-radius: 12px !important;
+    box-shadow: 4px 4px 0 var(--ah-outline, #33201A) !important;
+    color: #ffffff !important;
+    font-family: 'ZCOOL QingKe HuangYou', 'Courier New', monospace !important;
+    font-weight: 400 !important;
+}
+
+#applehut-cover .applehut-cover-enter:active {
+    animation: none !important;
+    transform: translate(-50%, 3px) !important;
+    box-shadow: none !important;
+}
+
+#applehut-cover .applehut-cover-heart {
+    color: var(--ah-apple-light, #F19A96) !important;
+}

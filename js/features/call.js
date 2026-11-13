@@ -30,6 +30,9 @@
         endReason:       null,   // 'user-hangup' | 'partner-busy' | 'partner-missed' | 'auto-quit' | 'incoming-missed' | 'incoming-rejected'
         startedAt:       null,   // 通话开始的精确时间戳（第一次进入 startCall 时）
         outgoingLogged:  false,  // 发起/来电提示是否已记过
+        ringerTimer:     null,   // 前台铃声循环定时器
+        audioCtx:        null,   // Web Audio 上下文
+        nativeRingId:    null,   // 后台原生来电通知的唯一 id，便于取消
     };
 
     const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
@@ -747,6 +750,76 @@ html:not([data-theme="dark"])[data-color-theme="black-white"] .message-sent{
         S.outgoingLogged = false;
     }
 
+    /** 前台：Web Audio 合成铃声（440Hz + 660Hz 双音交替，模拟电话铃）+ 循环震动 */
+    function startRingingFrontend() {
+        try {
+            if (!S.audioCtx) {
+                const AC = window.AudioContext || window.webkitAudioContext;
+                if (!AC) return;
+                S.audioCtx = new AC();
+            }
+            const ctx = S.audioCtx;
+            const playBurst = () => {
+                if (!S.audioCtx || S.audioCtx !== ctx) return;
+                // 440Hz / 660Hz 双音，各响 0.22s，各停 0.08s，共 ~0.6s 一个周期
+                const now = ctx.currentTime;
+                const makeTone = (freq, start, dur) => {
+                    const osc = ctx.createOscillator();
+                    const gain = ctx.createGain();
+                    osc.type = 'sine';
+                    osc.frequency.value = freq;
+                    osc.connect(gain);
+                    gain.connect(ctx.destination);
+                    gain.gain.setValueAtTime(0, now + start);
+                    gain.gain.linearRampToValueAtTime(0.25, now + start + 0.02);
+                    gain.gain.linearRampToValueAtTime(0.18, now + start + dur - 0.04);
+                    gain.gain.linearRampToValueAtTime(0, now + start + dur);
+                    osc.start(now + start);
+                    osc.stop(now + start + dur + 0.02);
+                };
+                makeTone(440, 0, 0.22);
+                makeTone(660, 0.30, 0.22);
+                // 震动 400ms + 停顿 200ms + 震动 400ms
+                if (navigator.vibrate) navigator.vibrate([400, 200, 400]);
+            };
+            playBurst();
+            S.ringerTimer = setInterval(playBurst, 1200);
+        } catch (e) { /* ignore */ }
+    }
+
+    /** 停掉前台铃声 + 原生来电通知 */
+    function stopRinging() {
+        if (S.ringerTimer) { clearInterval(S.ringerTimer); S.ringerTimer = null; }
+        if (S.audioCtx) {
+            try { S.audioCtx.close(); } catch (e) {}
+            S.audioCtx = null;
+        }
+        if (navigator.vibrate) { try { navigator.vibrate(0); } catch (e) {} }
+        // 取消后台原生来电通知
+        try { if (window.AppleHut && window.AppleHut.stopIncomingCallNotification) window.AppleHut.stopIncomingCallNotification(); } catch (e) {}
+    }
+
+    /**
+     * 统一入口：根据 App 是否在前台决定走哪条提醒路径。
+     * 前台 → Web Audio 铃声 + 震动（弹窗本身就在）
+     * 后台 → 原生层发系统高优先级通知 + 响系统铃声
+     */
+    function startRinging(name) {
+        // 原生层判断是否在前台；取不到时 fallback 到 document.hidden
+        const bg = (window.AppleHut && AppleHut.isForeground && AppleHut.isForeground() === false)
+                || document.visibilityState === 'hidden';
+        if (bg) {
+            // 后台 → 让原生层处理（系统通知 + 铃声 + 震动，可穿锁屏）
+            try {
+                if (window.AppleHut && window.AppleHut.showIncomingCallNotification) {
+                    window.AppleHut.showIncomingCallNotification(name || getName());
+                }
+            } catch (e) {}
+        } else {
+            startRingingFrontend();
+        }
+    }
+
     function showIncomingCall() {
         if (!S.enabled || S.active) return;
         const ov = document.getElementById('call-incoming-overlay');
@@ -754,6 +827,9 @@ html:not([data-theme="dark"])[data-color-theme="black-white"] .message-sent{
         fillAv('call-inc-avatar'); fillNm('call-inc-name');
         ov.classList.add('visible');
         clearTimeout(S.incomingTimer);
+
+        // 🔔 开始提醒（前台 Web Audio + 震动；后台走原生通知 + 铃声）
+        startRinging(getName());
 
         // 来电提示一出现就记一条
         S.outgoingLogged = true; // 防止用户先点发起再 auto-reject 时重复记录
@@ -770,6 +846,7 @@ html:not([data-theme="dark"])[data-color-theme="black-white"] .message-sent{
             S.incomingTimer = setTimeout(() => {
                 if (!ov.classList.contains('visible')) return;
                 ov.classList.remove('visible');
+                stopRinging();
                 const myName = (typeof settings !== 'undefined' && settings.myName) || '我';
                 const partnerName = getName();
                 const rejectLabels = [
@@ -790,6 +867,7 @@ html:not([data-theme="dark"])[data-color-theme="black-white"] .message-sent{
             S.incomingTimer = setTimeout(() => {
                 if (!ov.classList.contains('visible')) return;
                 ov.classList.remove('visible');
+                stopRinging();
                 const myName = (typeof settings !== 'undefined' && settings.myName) || '我';
                 logCallStage({
                     stage: 'missed',
@@ -937,6 +1015,7 @@ html:not([data-theme="dark"])[data-color-theme="black-white"] .message-sent{
         document.getElementById('call-inc-reject')?.addEventListener('click', () => {
             document.getElementById('call-incoming-overlay')?.classList.remove('visible');
             clearTimeout(S.incomingTimer);
+            stopRinging();
             const myName = (typeof settings !== 'undefined' && settings.myName) || '我';
             logCallStage({
                 stage: 'rejected',
@@ -948,6 +1027,7 @@ html:not([data-theme="dark"])[data-color-theme="black-white"] .message-sent{
         document.getElementById('call-inc-accept')?.addEventListener('click', () => {
             document.getElementById('call-incoming-overlay')?.classList.remove('visible');
             clearTimeout(S.incomingTimer);
+            stopRinging();
             logCallStage({
                 stage: 'accepted',
                 direction: 'inbound',
