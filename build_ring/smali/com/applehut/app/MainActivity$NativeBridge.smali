@@ -553,33 +553,35 @@
 
     if-eqz v0, :cond_fail
 
+    iget-object v1, p0, Lcom/applehut/app/MainActivity$NativeBridge;->this$0:Lcom/applehut/app/MainActivity;
+
     new-instance v2, Landroid/content/Intent;
 
     const-class v3, Lcom/applehut/app/MainActivity;
 
-    invoke-direct {v2, p0, v3}, Landroid/content/Intent;-><init>(Landroid/content/Context;Ljava/lang/Class;)V
+    invoke-direct {v2, v1, v3}, Landroid/content/Intent;-><init>(Landroid/content/Context;Ljava/lang/Class;)V
 
     const/high16 v3, 0x34000000
 
     invoke-virtual {v2, v3}, Landroid/content/Intent;->setFlags(I)Landroid/content/Intent;
 
-    const/4 v1, 0x0
+    const/4 v3, 0x0
 
-    const/high16 v3, 0xc000000
+    const/high16 v4, 0xc000000
 
-    invoke-static {p0, v1, v2, v3}, Landroid/app/PendingIntent;->getActivity(Landroid/content/Context;ILandroid/content/Intent;I)Landroid/app/PendingIntent;
+    invoke-static {v1, v3, v2, v4}, Landroid/app/PendingIntent;->getActivity(Landroid/content/Context;ILandroid/content/Intent;I)Landroid/app/PendingIntent;
 
-    move-result-object v1
+    move-result-object v2
 
-    new-instance v2, Landroid/app/Notification$Builder;
+    new-instance v3, Landroid/app/Notification$Builder;
 
-    const-string v3, "ah_call"
+    const-string v4, "ah_call"
 
-    invoke-direct {v2, p0, v3}, Landroid/app/Notification$Builder;-><init>(Landroid/content/Context;Ljava/lang/String;)V
+    invoke-direct {v3, v1, v4}, Landroid/app/Notification$Builder;-><init>(Landroid/content/Context;Ljava/lang/String;)V
 
-    const/high16 v3, 0x7f020000
+    const/high16 v4, 0x7f020000
 
-    invoke-virtual {v2, v3}, Landroid/app/Notification$Builder;->setSmallIcon(I)Landroid/app/Notification$Builder;
+    invoke-virtual {v3, v4}, Landroid/app/Notification$Builder;->setSmallIcon(I)Landroid/app/Notification$Builder;
 
     move-result-object v3
 
@@ -593,37 +595,41 @@
 
     move-result-object v3
 
-    const/4 p1, 0x1
+    const/4 v4, 0x1
 
-    invoke-virtual {v3, p1}, Landroid/app/Notification$Builder;->setOngoing(Z)Landroid/app/Notification$Builder;
+    invoke-virtual {v3, v4}, Landroid/app/Notification$Builder;->setOngoing(Z)Landroid/app/Notification$Builder;
 
     move-result-object v3
 
-    const/4 p1, -0x1
+    const/4 v4, -0x1
 
-    invoke-virtual {v3, p1}, Landroid/app/Notification$Builder;->setPriority(I)Landroid/app/Notification$Builder;
+    invoke-virtual {v3, v4}, Landroid/app/Notification$Builder;->setPriority(I)Landroid/app/Notification$Builder;
 
-    move-result-object p1
+    move-result-object v3
 
-    const-string p2, "call"
+    const-string v4, "call"
 
-    invoke-virtual {p1, p2}, Landroid/app/Notification$Builder;->setCategory(Ljava/lang/String;)Landroid/app/Notification$Builder;
+    invoke-virtual {v3, v4}, Landroid/app/Notification$Builder;->setCategory(Ljava/lang/String;)Landroid/app/Notification$Builder;
 
-    move-result-object p1
+    move-result-object v3
 
-    const p2, -0x1175b1
+    const v4, -0x1175b1
 
-    invoke-virtual {p1, p2}, Landroid/app/Notification$Builder;->setColor(I)Landroid/app/Notification$Builder;
+    invoke-virtual {v3, v4}, Landroid/app/Notification$Builder;->setColor(I)Landroid/app/Notification$Builder;
 
-    move-result-object p1
+    move-result-object v3
 
-    invoke-virtual {p1}, Landroid/app/Notification$Builder;->build()Landroid/app/Notification;
+    invoke-virtual {v3, v2}, Landroid/app/Notification$Builder;->setContentIntent(Landroid/app/PendingIntent;)Landroid/app/Notification$Builder;
 
-    move-result-object p1
+    move-result-object v3
 
-    const/16 v2, 0x3e9
+    invoke-virtual {v3}, Landroid/app/Notification$Builder;->build()Landroid/app/Notification;
 
-    invoke-virtual {v0, v2, p1}, Landroid/app/NotificationManager;->notify(ILandroid/app/Notification;)V
+    move-result-object v3
+
+    const/16 v4, 0x3e9
+
+    invoke-virtual {v0, v4, v3}, Landroid/app/NotificationManager;->notify(ILandroid/app/Notification;)V
     :try_end_0
     .catchall {:try_start_0 .. :try_end_0} :catchall_fail
 

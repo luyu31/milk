@@ -36,7 +36,7 @@
 .end method
 
 .method private buildNotification()Landroid/app/Notification;
-    .locals 6
+    .locals 8
 
     new-instance v0, Landroid/content/Intent;
 
@@ -48,120 +48,107 @@
 
     invoke-virtual {v0, v1}, Landroid/content/Intent;->setFlags(I)Landroid/content/Intent;
 
-    const/4 v1, 0x0
+    const/4 v2, 0x0
 
-    const/high16 v2, 0xc000000
+    const/high16 v3, 0xc000000
 
-    :try_start_0
-    invoke-static {p0, v1, v0, v2}, Landroid/app/PendingIntent;->getActivity(Landroid/content/Context;ILandroid/content/Intent;I)Landroid/app/PendingIntent;
+    invoke-static {p0, v2, v0, v3}, Landroid/app/PendingIntent;->getActivity(Landroid/content/Context;ILandroid/content/Intent;I)Landroid/app/PendingIntent;
 
-    move-result-object v0
-    :try_end_0
-    .catchall {:try_start_0 .. :try_end_0} :catchall_0
+    move-result-object v4
 
-    goto :goto_0
+    sget-boolean v5, Lcom/applehut/app/KeepAliveService;->inCall:Z
 
-    :catchall_0
-    move-exception v0
+    if-eqz v5, :cond_idle
 
-    const/4 v0, 0x0
+    const-string v5, "ah_call"
 
-    :goto_0
-    sget-boolean v1, Lcom/applehut/app/KeepAliveService;->inCall:Z
+    const-string v6, "Apple Hut · 通话中"
 
-    if-eqz v1, :cond_call
-    const-string v1, "ah_call"
+    const-string v7, "点击回到通话界面"
 
-    const-string v2, "Apple Hut · 通话中"
+    const/4 v0, 0x1
 
-    const-string v3, "点按回到通话界面"
+    const-string v1, "call"
 
-    const/4 v4, 0x1
+    goto :goto_chan
 
-    const-string v5, "call"
+    :cond_idle
+    const-string v5, "ah_other"
 
-    goto :goto_channel
+    const-string v6, "Apple Hut 正在后台运行"
 
-    :cond_call
-    const-string v1, "ah_other"
+    const-string v7, "保持连接，随时接收新消息"
 
-    const-string v2, "Apple Hut 正在后台运行"
+    const/4 v0, -0x1
 
-    const-string v3, "保持连接，随时接收新消息"
+    const-string v1, "service"
 
-    const/4 v4, -0x1
+    :goto_chan
+    sget v2, Landroid/os/Build$VERSION;->SDK_INT:I
 
-    const-string v5, "service"
+    const/16 v3, 0x1a
 
-    :goto_channel
-    sget p1, Landroid/os/Build$VERSION;->SDK_INT:I
+    if-lt v2, v3, :cond_old
 
-    const/16 p2, 0x1a
+    new-instance v2, Landroid/app/Notification$Builder;
 
-    if-lt p1, p2, :cond_newbuilder
+    invoke-direct {v2, p0, v5}, Landroid/app/Notification$Builder;-><init>(Landroid/content/Context;Ljava/lang/String;)V
 
-    new-instance p1, Landroid/app/Notification$Builder;
+    goto :goto_b
 
-    invoke-direct {p1, p0, v1}, Landroid/app/Notification$Builder;-><init>(Landroid/content/Context;Ljava/lang/String;)V
+    :cond_old
+    new-instance v2, Landroid/app/Notification$Builder;
 
-    goto :goto_builder
+    invoke-direct {v2, p0}, Landroid/app/Notification$Builder;-><init>(Landroid/content/Context;)V
 
-    :cond_newbuilder
-    new-instance p1, Landroid/app/Notification$Builder;
+    :goto_b
+    const/high16 v3, 0x7f020000
 
-    invoke-direct {p1, p0}, Landroid/app/Notification$Builder;-><init>(Landroid/content/Context;)V
+    invoke-virtual {v2, v3}, Landroid/app/Notification$Builder;->setSmallIcon(I)Landroid/app/Notification$Builder;
 
-    :goto_builder
-    const/high16 p2, 0x7f020000
+    move-result-object v2
 
-    invoke-virtual {p1, p2}, Landroid/app/Notification$Builder;->setSmallIcon(I)Landroid/app/Notification$Builder;
+    invoke-virtual {v2, v6}, Landroid/app/Notification$Builder;->setContentTitle(Ljava/lang/CharSequence;)Landroid/app/Notification$Builder;
 
-    move-result-object p1
+    move-result-object v2
 
-    invoke-virtual {p1, v2}, Landroid/app/Notification$Builder;->setContentTitle(Ljava/lang/CharSequence;)Landroid/app/Notification$Builder;
+    invoke-virtual {v2, v7}, Landroid/app/Notification$Builder;->setContentText(Ljava/lang/CharSequence;)Landroid/app/Notification$Builder;
 
-    move-result-object p1
+    move-result-object v2
 
-    invoke-virtual {p1, v3}, Landroid/app/Notification$Builder;->setContentText(Ljava/lang/CharSequence;)Landroid/app/Notification$Builder;
+    const/4 v3, 0x1
 
-    move-result-object p1
+    invoke-virtual {v2, v3}, Landroid/app/Notification$Builder;->setOngoing(Z)Landroid/app/Notification$Builder;
 
-    const/4 p2, 0x1
+    move-result-object v2
 
-    invoke-virtual {p1, p2}, Landroid/app/Notification$Builder;->setOngoing(Z)Landroid/app/Notification$Builder;
+    const/4 v3, 0x0
 
-    move-result-object p1
+    invoke-virtual {v2, v3}, Landroid/app/Notification$Builder;->setAutoCancel(Z)Landroid/app/Notification$Builder;
 
-    const/4 p2, 0x0
+    move-result-object v2
 
-    invoke-virtual {p1, p2}, Landroid/app/Notification$Builder;->setAutoCancel(Z)Landroid/app/Notification$Builder;
+    invoke-virtual {v2, v3}, Landroid/app/Notification$Builder;->setShowWhen(Z)Landroid/app/Notification$Builder;
 
-    move-result-object p1
+    move-result-object v2
 
-    invoke-virtual {p1, p2}, Landroid/app/Notification$Builder;->setShowWhen(Z)Landroid/app/Notification$Builder;
+    invoke-virtual {v2, v0}, Landroid/app/Notification$Builder;->setPriority(I)Landroid/app/Notification$Builder;
 
-    move-result-object p1
+    move-result-object v2
 
-    invoke-virtual {p1, v4}, Landroid/app/Notification$Builder;->setPriority(I)Landroid/app/Notification$Builder;
+    invoke-virtual {v2, v1}, Landroid/app/Notification$Builder;->setCategory(Ljava/lang/String;)Landroid/app/Notification$Builder;
 
-    move-result-object p1
+    move-result-object v2
 
-    invoke-virtual {p1, v5}, Landroid/app/Notification$Builder;->setCategory(Ljava/lang/String;)Landroid/app/Notification$Builder;
+    invoke-virtual {v2, v4}, Landroid/app/Notification$Builder;->setContentIntent(Landroid/app/PendingIntent;)Landroid/app/Notification$Builder;
 
-    if-eqz v0, :cond_no_pi
+    move-result-object v2
 
-    invoke-virtual {p1, v0}, Landroid/app/Notification$Builder;->setContentIntent(Landroid/app/PendingIntent;)Landroid/app/Notification$Builder;
+    invoke-virtual {v2}, Landroid/app/Notification$Builder;->build()Landroid/app/Notification;
 
-    :cond_no_pi
-    const/4 p2, -0x1
+    move-result-object v2
 
-    invoke-virtual {p1, p2}, Landroid/app/Notification$Builder;->setVisibility(I)Landroid/app/Notification$Builder;
-
-    invoke-virtual {p1}, Landroid/app/Notification$Builder;->build()Landroid/app/Notification;
-
-    move-result-object v0
-
-    return-object v0
+    return-object v2
 .end method
 
 .method public static isRunning()Z
