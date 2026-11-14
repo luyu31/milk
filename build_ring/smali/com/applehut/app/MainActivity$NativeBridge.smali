@@ -573,7 +573,7 @@
 
     new-instance v2, Landroid/app/Notification$Builder;
 
-    const-string v3, "ah_incoming_call"
+    const-string v3, "ah_call"
 
     invoke-direct {v2, p0, v3}, Landroid/app/Notification$Builder;-><init>(Landroid/content/Context;Ljava/lang/String;)V
 
